@@ -108,6 +108,7 @@ local function newEnv(W)
 		function f:SetPoint(...) self.lastPoint = { ... } end
 		function f:SetupMenu(fn) self.menuGen = fn end
 		function f:SetSelectionTranslator(fn) self.selTranslator = fn end
+		function f:SetSelectionText(fn) self.selText = fn end
 		function f:RegisterEvent(e) self.events = self.events or {}; self.events[e] = true end
 		function f:RegisterUnitEvent(e) self.events = self.events or {}; self.events[e] = true end
 		E.frames[#E.frames + 1] = f
@@ -185,6 +186,7 @@ local function load(opts)
 	local W = newWorld()
 	local E = newEnv(W)
 	local ns = {}
+	addUnit(W, "player", { class = opts.class or "PALADIN", name = "Tek", guid = "Player-Tek" })    -- before the files load: the class decides
 	for _, f in ipairs(TOC_FILES) do
 		local chunk, err = loadfile(f, "t", E.g)
 		if not chunk then error(err) end
@@ -192,8 +194,8 @@ local function load(opts)
 		chunk("WellMet", ns)
 	end
 	local WM = ns.WM
+	if not ns.supported then return nil, ns, E, W end
 	WM:ADDON_LOADED("ADDON_LOADED", "WellMet")
-	addUnit(W, "player", { class = "PALADIN", name = "Tek", guid = "Player-Tek" })
 	if opts.login ~= false then WM:PLAYER_LOGIN() end
 	if WM.db and opts.debug ~= false then WM.db.debug = true end     -- most checks read press messages / the log
 	return WM, ns, E, W
@@ -591,6 +593,107 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Mage (stack mode)")
+do
+	local WM, ns, E, W = load({ class = "MAGE", login = false })
+	W.spells["Arcane Intellect"] = 1459; W.spells["Dampen Magic"] = 604; W.spells["Amplify Magic"] = 1008
+	W.known[1459] = true; W.known[604] = true; W.known[1008] = true
+	WM:PLAYER_LOGIN(); WM.db.debug = true
+	local B = WM.caster and WM.caster.buffs
+	check("a Mage loads in stack mode with Intellect / Dampen / Amplify", WM.caster and WM.caster.mode == "stack" and #WM.caster.order == 3
+		and B.INTELLECT.name == "Arcane Intellect" and B.DAMPEN.name == "Dampen Magic" and B.AMPLIFY.name == "Amplify Magic")
+
+	local Select = ns.Select
+	local function cand(key, class, order) return { unit = key, key = key, name = key, tier = 2, class = class, order = order or 1 } end
+	local probe = { known = function() return true end, inRange = function() return true end, lacks = function() return true end, distance = function() return nil end }
+	local function ctx(settings) return { now = 100, settings = settings, caster = WM.caster, probe = probe } end
+	local s = { assign = {}, stack = {}, unknownClass = "WISDOM", strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
+
+	local best, skipped, eligible = Select.Pick({ cand("w", "WARRIOR"), cand("p", "PRIEST") }, ctx(s))
+	check("Intellect goes on a mana class by default, not on a Warrior",
+		best.cand.key == "p" and best.buff.key == "INTELLECT" and #eligible == 1 and skipped[1].reason:find("no buffs are switched on", 1, true) ~= nil)
+	best = Select.Pick({ cand("?", nil) }, ctx(s))
+	check("an unreadable class gets Intellect by default", best and best.buff.key == "INTELLECT")
+	best = Select.Pick({ cand("r", "ROGUE") }, ctx(s))
+	check("Rogue gets nothing by default", best == nil)
+
+	-- stacking
+	ns.StackSet(WM.caster, B.DAMPEN, "PRIEST", true)
+	local _, _, el = Select.Pick({ cand("p", "PRIEST") }, ctx({ assign = {}, stack = WM.db.stack, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }))
+	check("with Dampen on, one person yields Intellect then Dampen", #el == 2 and el[1].buff.key == "INTELLECT" and el[2].buff.key == "DAMPEN")
+	Select.Mark("p", "Arcane Intellect", 8, 100)
+	best = Select.Pick({ cand("p", "PRIEST"), cand("q", "PRIEST", 2) }, ctx({ assign = {}, stack = WM.db.stack, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }))
+	check("after Intellect was just cast, the next press does Dampen on the same person", best.cand.key == "p" and best.buff.key == "DAMPEN")
+	Select.Reset()
+
+	-- Dampen / Amplify replace each other
+	ns.StackSet(WM.caster, B.AMPLIFY, "PRIEST", true)
+	check("switching Amplify on switches Dampen off for that class",
+		ns.StackEnabled(B.AMPLIFY, "PRIEST", WM.db.stack) and not ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
+	check("...and leaves other classes alone", not ns.StackEnabled(B.AMPLIFY, "MAGE", WM.db.stack) and ns.StackEnabled(B.INTELLECT, "MAGE", WM.db.stack))
+	WM.db.stack = {}
+
+	-- Arcane Brilliance counts as having Intellect
+	addUnit(W, "party1", { class = "PRIEST", name = "Pria", guid = "G-pria", auras = { ["Arcane Brilliance"] = true } })
+	check("Arcane Brilliance counts as having Arcane Intellect", ns.Lacks("party1", B.INTELLECT) == false)
+
+	-- a key press: you first (Mage -> Intellect on yourself via the direct spell path)
+	W.units.player.auras = {}
+	W.groupSize = 0
+	local btn = press(E)
+	check("a press buffs you with Arcane Intellect", btn.attrs.type == "spell" and btn.attrs.spell == "Arcane Intellect" and btn.attrs.unit == "player")
+	ns.Select.Reset()
+
+	-- nobody needs anything: the message names only the buffs that are switched on somewhere
+	W.units.player.auras = { ["Arcane Intellect"] = true }
+	W.prints = {}
+	W.now = W.now + 100
+	press(E)
+	check("'Nobody nearby needs ...' lists only the switched-on buffs (no Dampen / Amplify by default)",
+		printed(W, "Nobody nearby needs Arcane Intellect.") and not printed(W, "Dampen"))
+	W.units.player.auras = {}
+
+	-- settings: one multi-select dropdown per class (11 = radius + 9 classes + unreadable)
+	local dds = {}
+	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
+	check("Mage settings have 11 dropdowns (radius + 9 classes + unreadable)", #dds == 11)
+	local function checklist(dd)
+		local items = {}
+		dd.menuGen(dd, { CreateCheckbox = function(_, label, isSelected, toggle, data)
+			local item = { label = label, on = isSelected(), toggle = toggle, data = data }
+			items[#items + 1] = item
+			return { SetTooltip = function(_, fn) item.tooltip = fn end }
+		end })
+		return items
+	end
+	local priest = checklist(dds[6])      -- Druid, Hunter, Mage, Paladin, Priest -> 6th dropdown (1st is the radius)
+	check("a class dropdown lists the three buffs with icons; Intellect is ticked by default",
+		#priest == 3 and priest[1].label:find("|T1001459:", 1, true) and priest[1].label:find("Arcane Intellect", 1, true) and priest[1].on and not priest[2].on and not priest[3].on)
+	priest[2].toggle()
+	check("ticking Dampen Magic saves it", checklist(dds[6])[2].on and ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
+	checklist(dds[6])[3].toggle()
+	check("ticking Amplify Magic unticks Dampen Magic", checklist(dds[6])[3].on and not checklist(dds[6])[2].on)
+	check("the closed dropdown shows the icons of what is ticked",
+		dds[6].selText({ { data = "INTELLECT" }, { data = "AMPLIFY" } }) == "|T1001459:20|t|T1001008:20|t" and dds[6].selText({}):find("none", 1, true) ~= nil)
+	WM.db.stack = {}
+
+	-- a spell the player hasn't learned: its own icon (from the data), greyed, with an "Unknown" tooltip
+	W.known[1008] = nil; W.spells["Amplify Magic"] = nil
+	local unk = checklist(dds[6])
+	check("an unlearned buff keeps its real icon (from the data file), not a question mark",
+		unk[3].label:find("Spell_Holy_FlashHeal", 1, true) ~= nil and not unk[3].label:find("134400", 1, true))
+	check("...with the icon dimmed and the name greyed", unk[3].label:find(":110:110:110|t", 1, true) ~= nil and unk[3].label:find("|cff808080Amplify Magic|r", 1, true) ~= nil)
+	check("a learned buff in the same list is not greyed", not unk[1].label:find("110:110:110", 1, true) and not unk[1].label:find("808080", 1, true))
+	local lines = {}
+	E.g.GameTooltip_SetTitle = function(_, text) lines[#lines + 1] = text end
+	E.g.GameTooltip_AddNormalLine = function(_, text) lines[#lines + 1] = text end
+	check("only the unlearned buff has a tooltip, and it says Unknown", unk[3].tooltip ~= nil and unk[1].tooltip == nil and unk[2].tooltip == nil)
+	unk[3].tooltip({})
+	check("the tooltip title is 'Unknown'", lines[1] == "Unknown")
+	check("the closed dropdown dims an unlearned buff's icon too", dds[6].selText({ { data = "AMPLIFY" } }):find("110:110:110", 1, true) ~= nil)
+end
+
+----------------------------------------------------------------------
 print("== Minimap button")
 do
 	local WM, ns, E, W = load()
@@ -708,14 +811,16 @@ do
 	local bomb = setmetatable({}, { __tostring = function() error("secret!") end })
 	check("SafeStr survives unreadable values", ns.SafeStr(bomb) == "<unreadable>" and pcall(function() WM:Log("x", bomb, nil) end))
 
-	-- a non-paladin loads cleanly and refuses politely
-	local WM2, ns2, E2, W2 = load({ login = false })
-	E2.g.UnitClass = function() return "Mage", "MAGE" end
-	WM2:PLAYER_LOGIN()
-	check("an unsupported class loads without error", WM2.caster == nil)
-	local b = E2.g.WellMetCast
-	b.scripts.PreClick(b, "LeftButton", true)
-	check("...and a press explains instead of casting", b.attrs.type == nil and printed(W2, "only buffs from a Paladin"))
+	-- a class with no buffs: WellMet does nothing at all
+	do
+		local WM2, ns2, E2, W2 = load({ class = "WARRIOR" })
+		check("a class with no buffs is not supported, and WellMet stays out of the way", ns2.supported == false and WM2 == nil and ns2.WM == nil)
+		check("...it creates no frames, button, settings, minimap button, slash commands or chat messages",
+			#E2.frames == 0 and E2.g.WellMetCast == nil and E2.g.WellMetMinimap == nil and E2.g.WellMetOptionsPanel == nil
+			and (E2.g.SlashCmdList == nil or E2.g.SlashCmdList.WELLMET == nil) and #W2.prints == 0)
+		local _, ns3 = load({ class = "MAGE", login = false })
+		check("Paladin and Mage are supported", ns3.supported == true and select(2, load({ login = false })).supported == true)
+	end
 end
 
 print(string.format("\n%d passed, %d failed", passes, failures))

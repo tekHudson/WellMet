@@ -5,8 +5,9 @@ One key buffs the next nearby player who needs it. Built for **WoW Forever** (In
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.
 
-**This first pass is Paladin only** (Blessing of Might / Blessing of Wisdom). Priest, Mage and Druid
-are planned.
+**Paladin** (Blessing of Might / Wisdom, one per class) and **Mage** (Arcane Intellect, plus optional Dampen /
+Amplify Magic, ticked per class) so far. Priest and Druid are planned. On a character whose class has no buffs
+(Warrior, Rogue, ...) WellMet does nothing at all: no messages, no settings, no minimap button.
 
 ## Use
 

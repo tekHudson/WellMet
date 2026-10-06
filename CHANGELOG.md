@@ -8,6 +8,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 ### Added
 - First pass (Paladin): one key / `/click WellMetCast` buffs the next nearby player who lacks
   Blessing of Might or Blessing of Wisdom; press again for the next person.
+- Mage: Arcane Intellect (Arcane Brilliance counts as having it) on mana classes by default, plus optional
+  Dampen Magic / Amplify Magic (they replace each other); a checkbox dropdown per target class in settings.
+- Classes with no buffs get no WellMet at all (nothing is created or printed).
+- Settings show a buff you haven't learned greyed out, with its own icon and an "Unknown" tooltip.
 - Candidates: you, your group, your target, and friendly-player nameplates (strangers).
   Order: you, then group, then everyone else; nearest first; arrival order breaks ties.
 - Settings: key, search radius (cast range / 28 yd / 10 yd), include strangers, group first, buff myself,

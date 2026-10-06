@@ -13,6 +13,7 @@ Forever notes:
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 ----------------------------------------------------------------------
@@ -25,12 +26,11 @@ function ns.SpellId(buff)
 	return info and info.spellID or nil
 end
 
--- The spell's icon (a file id) for the settings UI. A spell the player doesn't know yet still has
--- an icon; if the client can't resolve the name at all, the generic question-mark icon.
-local QUESTION_MARK_ICON = 134400
+-- The spell's icon for the settings UI: the client's own when it can describe the spell, else the icon
+-- stored in Data/Classes.lua (the client can't describe a spell the player hasn't learned).
 function ns.SpellIcon(buff)
 	local info = C_Spell.GetSpellInfo(buff.name)
-	return info and info.iconID or QUESTION_MARK_ICON
+	return info and info.iconID or buff.icon
 end
 
 function ns.IsKnown(buff)
@@ -40,7 +40,6 @@ end
 
 -- Re-resolve ids for the caster's buffs (login, and when spells change).
 function WM:InitSpells()
-	if not WM.caster then return end
 	for _, key in ipairs(WM.caster.order) do
 		local buff = WM.caster.buffs[key]
 		buff.id = ns.SpellId(buff)

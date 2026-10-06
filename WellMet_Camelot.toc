@@ -7,11 +7,13 @@
 ## IconTexture: Interface\AddOns\WellMet\Icons\Icon
 ## SavedVariables: WellMetDB
 
+# Data\Classes.lua loads first and decides whether this character's class can buff anyone (ns.supported);
+# every other file returns at once if not, so WellMet does nothing on those characters.
 # WoW Forever only. The client picks this file by its game-type suffix (_Camelot);
 # there is deliberately no unsuffixed WellMet.toc. Bindings.xml loads automatically.
 
-WellMet.lua
 Data\Classes.lua
+WellMet.lua
 Core\DB.lua
 Core\Spells.lua
 Core\Discovery.lua

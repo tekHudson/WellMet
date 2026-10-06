@@ -16,6 +16,7 @@ Layout:
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 
 local WM = {}
 _G.WellMet = WM
@@ -112,9 +113,7 @@ function WM:PLAYER_LOGIN()
 
 	WM:SetupSlash()
 	WM:Print("v" .. WM.version .. " loaded. /wellmet for settings.")
-	if not WM.caster then
-		WM:Print("This version only buffs from a Paladin (blessings); other classes are coming. Settings and /wellmet log still work.")
-	elseif not GetBindingKey(ns.CLICK_ACTION) then
+	if not GetBindingKey(ns.CLICK_ACTION) then
 		WM:Print("No key set yet: bind one under Key Bindings > WellMet (/wellmet has a button for it).")
 	end
 end

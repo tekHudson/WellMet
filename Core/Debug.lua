@@ -10,6 +10,7 @@ helping. The report has:
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 local S = ns.SafeStr
@@ -56,7 +57,7 @@ function WM:BuildReport()
 	section(out, "Overview", function(add)
 		local version, build, _, toc = GetBuildInfo()
 		add(string.format("addon %s | client %s (%s) interface %s", S(WM.version), S(version), S(build), S(toc)))
-		add(string.format("player=%s class=%s supported=%s", S(WM.player), S(WM.classToken), yn(WM.caster)))
+		add(string.format("player=%s class=%s", S(WM.player), S(WM.classToken)))
 		add(string.format("radius=%s  strangers=%s  groupFirst=%s  includeSelf=%s  allowMounted=%s  unknownClass=%s",
 			S(db.radius), yn(db.strangers), yn(db.groupFirst), yn(db.includeSelf), yn(db.allowMounted), S(db.unknownClass)))
 		add("debug=" .. yn(db.debug))
@@ -72,16 +73,13 @@ function WM:BuildReport()
 		add(string.format("failure strings: LOS=%s range=%s ERR_OUT_OF_RANGE=%s vision=%s bounced=%s",
 			yn(_G.SPELL_FAILED_LINE_OF_SIGHT), yn(_G.SPELL_FAILED_OUT_OF_RANGE), yn(_G.ERR_OUT_OF_RANGE),
 			yn(_G.SPELL_FAILED_VISION_OBSCURED), yn(_G.SPELL_FAILED_AURA_BOUNCED)))
-		if WM.caster then
-			for _, key in ipairs(WM.caster.order) do
-				local buff = WM.caster.buffs[key]
-				add(string.format("buff %-6s %-22s id=%s known=%s", key, buff.name, S(ns.SpellId(buff)), yn(ns.IsKnown(buff))))
-			end
+		for _, key in ipairs(WM.caster.order) do
+			local buff = WM.caster.buffs[key]
+			add(string.format("buff %-9s %-22s id=%s known=%s", key, buff.name, S(ns.SpellId(buff)), yn(ns.IsKnown(buff))))
 		end
 	end)
 
 	section(out, "Right now (what a key press would see)", function(add)
-		if not WM.caster then add("(this class has no buffs in WellMet yet)"); return end
 		local cands, rejected, info = ns.Discovery.Discover()
 		add(string.format("%d candidates, %d rejected, %d nameplates visible", #cands, #rejected, info.nameplates))
 		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe }

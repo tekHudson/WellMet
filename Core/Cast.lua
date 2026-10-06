@@ -13,6 +13,7 @@ puts that target on a longer skip.
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 local BUTTON_NAME = "WellMetCast"
@@ -42,9 +43,18 @@ local function clearArm(b)
 	b:SetAttribute("macrotext", nil)
 end
 
+-- The buff names for the "Nobody nearby needs ..." message. A stack caster only lists buffs that are
+-- switched on for at least one target class.
 local function names(caster)
 	local list = {}
-	for _, key in ipairs(caster.order) do list[#list + 1] = caster.buffs[key].name end
+	for _, key in ipairs(caster.order) do
+		local buff = caster.buffs[key]
+		local used = caster.mode ~= "stack" or ns.StackEnabled(buff, nil, WM.db.stack)
+		for _, class in ipairs(ns.TargetClasses) do
+			used = used or ns.StackEnabled(buff, class, WM.db.stack)
+		end
+		if used then list[#list + 1] = buff.name end
+	end
 	return table.concat(list, " / ")
 end
 
@@ -65,11 +75,6 @@ function WM:OnPress(b, fromMacro)
 	end
 	clearArm(b)
 
-	if not WM.caster then
-		WM:Note("This version only buffs from a Paladin (blessings).")
-		WM:Log("press blocked: no caster data for class", ns.SafeStr(WM.classToken))
-		return
-	end
 	if UnitOnTaxi("player") or IsFlying() then
 		WM:Note("Not while flying.")
 		WM:Log("press blocked: flying / on taxi")

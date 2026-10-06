@@ -15,6 +15,7 @@ per-unit fallback key).
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 local Discovery = {}

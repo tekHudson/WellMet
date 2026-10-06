@@ -6,6 +6,7 @@ grey, 128x128.
 ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 local ICON = "Interface\\AddOns\\WellMet\\Icons\\Icon"

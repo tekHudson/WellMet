@@ -1,6 +1,7 @@
 --[[ WellMet — saved variables with a tiny recursive defaults merge. ]]
 
 local ADDON, ns = ...
+if not ns.supported then return end      -- this class has no buffs: WellMet does nothing
 local WM = ns.WM
 
 local DEFAULTS = {
@@ -12,7 +13,8 @@ local DEFAULTS = {
 	unknownClass = "WISDOM",   -- blessing for targets whose class can't be read
 	minimap      = { hide = false, angle = 200 },   -- minimap button: hidden?, position around the minimap (degrees)
 	debug        = false,      -- record the /wellmet log and show press-time chat messages
-	assign       = {},         -- target class -> buff key ("NONE" skips); falls back to ns.DefaultAssign
+	assign       = {},         -- Paladin: target class -> buff key ("NONE" skips); falls back to ns.DefaultAssign
+	stack        = {},         -- Mage: buff key -> { target class -> true/false }; falls back to the buff's defaultClasses
 }
 
 local function applyDefaults(target, defaults)
@@ -32,6 +34,27 @@ function WM:InitDB()
 	WellMetDB = WellMetDB or {}
 	WellMetDB.profile = applyDefaults(WellMetDB.profile or {}, DEFAULTS)
 	WM.db = WellMetDB.profile
+end
+
+-- Is a "stack" buff (Mage) switched on for this target class? class nil = unreadable (stored as "UNKNOWN").
+function ns.StackEnabled(buff, class, stack)
+	local saved = stack and stack[buff.key]
+	local c = class or "UNKNOWN"
+	if saved and saved[c] ~= nil then return saved[c] end
+	return buff.defaultClasses and buff.defaultClasses[c] or false
+end
+
+-- Switch a stack buff on/off for a class; switching one on switches off the buff it replaces.
+function ns.StackSet(caster, buff, class, on)
+	local stack = WM.db.stack
+	local c = class or "UNKNOWN"
+	stack[buff.key] = stack[buff.key] or {}
+	stack[buff.key][c] = on and true or false
+	if on and buff.exclusive then
+		local other = caster.buffs[buff.exclusive]
+		stack[other.key] = stack[other.key] or {}
+		stack[other.key][c] = false
+	end
 end
 
 -- The buff key assigned to a target class (nil class = unreadable class).
