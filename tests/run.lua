@@ -84,7 +84,8 @@ local function newEnv(W)
 	g.IsShiftKeyDown = function() return false end
 	g.GetCVar = function(k) return W.cvars[k] end
 	g.SetCVar = function(k, v) W.cvars[k] = tostring(v) end
-	g.LOCALIZED_CLASS_NAMES_MALE = { WARRIOR = "Warrior", PALADIN = "Paladin" }
+	g.LOCALIZED_CLASS_NAMES_MALE = { WARRIOR = "Warrior", PALADIN = "Paladin", HUNTER = "Hunter", ROGUE = "Rogue", PRIEST = "Priest",
+		SHAMAN = "Shaman", MAGE = "Mage", WARLOCK = "Warlock", DRUID = "Druid" }
 	g.RAID_CLASS_COLORS = { WARRIOR = { r = 0.78, g = 0.61, b = 0.43 } }
 	g.SPELL_FAILED_LINE_OF_SIGHT = "Target not in line of sight"
 	g.SPELL_FAILED_OUT_OF_RANGE = "Out of range"
@@ -104,6 +105,9 @@ local function newEnv(W)
 		function f:SetChecked(v) self.checked = v end
 		function f:GetText() return self.text end
 		function f:SetText(t) self.text = t end
+		function f:SetPoint(...) self.lastPoint = { ... } end
+		function f:SetupMenu(fn) self.menuGen = fn end
+		function f:SetSelectionTranslator(fn) self.selTranslator = fn end
 		function f:RegisterEvent(e) self.events = self.events or {}; self.events[e] = true end
 		function f:RegisterUnitEvent(e) self.events = self.events or {}; self.events[e] = true end
 		E.frames[#E.frames + 1] = f
@@ -135,7 +139,7 @@ local function newEnv(W)
 
 	-- spells / auras / secrets
 	g.C_Spell = {
-		GetSpellInfo = function(name) local id = W.spells[name]; return id and { name = name, spellID = id } or nil end,
+		GetSpellInfo = function(name) local id = W.spells[name]; return id and { name = name, spellID = id, iconID = 1000000 + id } or nil end,
 		GetSpellName = function(id) for n, i in pairs(W.spells) do if i == id then return n end end end,
 		IsSpellInRange = function(name, unit) local x = U(unit); if not x then return nil end; return x.inRange end,
 	}
@@ -155,6 +159,8 @@ local function newEnv(W)
 			UnitFrame = { name = { GetText = function() return u and (u.plateText or (u.name .. " Surname")) end } } } end return t end }
 
 	-- bindings
+	g.Minimap = { GetWidth = function() return 198 end, GetCenter = function() return 0, 0 end, GetEffectiveScale = function() return 1 end }
+	g.C_Timer = { After = function(_, fn) fn() end }        -- run at once; the real delay doesn't matter here
 	g.GetBindingAction = function(key) return W.overrides[key] or W.bindings[key] or "" end
 	g.GetBindingKey = function(action) for key, a in pairs(W.bindings) do if a == action then return key end end end
 	g.ClearOverrideBindings = function() W.overrides = {} end
@@ -593,6 +599,10 @@ do
 	check("minimap button uses the shipped WM icon, and the file exists",
 		readFile("UI/Minimap.lua"):find('Interface\\\\AddOns\\\\WellMet\\\\Icons\\\\Icon"', 1, true) ~= nil
 		and #readFile("Icons/Icon.tga") > 18 and readFile("WellMet_Camelot.toc"):find("IconTexture: Interface\\AddOns\\WellMet\\Icons\\Icon", 1, true) ~= nil)
+	local p = mb.lastPoint
+	local want = (198 / 2 + 5)
+	check("button sits on the rim: radius = half the minimap width + 5, at the saved angle (200 deg)",
+		p and p[1] == "CENTER" and math.abs(p[4] - want * math.cos(math.rad(200))) < 0.01 and math.abs(p[5] - want * math.sin(math.rad(200))) < 0.01)
 	W.openedCategory = nil
 	mb.scripts.OnClick(mb, "LeftButton")
 	check("left-click opens the settings", W.openedCategory == 1)
@@ -621,6 +631,50 @@ do
 	check("options panel builds with stock templates", WM.optionsPanel ~= nil and WM.refreshOptions ~= nil)
 	check("refreshing the options runs without error", pcall(WM.refreshOptions))
 
+	-- dropdowns: 1 radius + 9 classes + "class unreadable", each listing its choices as radio items
+	local function menuOf(dd)
+		local items = {}
+		dd.menuGen(dd, { CreateRadio = function(_, label, isSelected, setSelected, data) items[#items + 1] = { label = label, selected = isSelected(), pick = setSelected, data = data } end })
+		return items
+	end
+	local dds = {}
+	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
+	check("radius + 9 classes + unreadable = 11 dropdowns, no cycle buttons", #dds == 11 and not readFile("UI/Options.lua"):find("cycle(", 1, true))
+	local radius = menuOf(dds[1])
+	check("radius dropdown lists cast range / 28 / 10 and marks the saved one", #radius == 3 and radius[1].selected and not radius[2].selected)
+	radius[2].pick()
+	check("picking 28 yards saves it", WM.db.radius == 28)
+	local warrior = menuOf(dds[10])         -- classes are alphabetical, so Warrior is the last class row
+	check("a class dropdown lists Might / Wisdom / Skip, each with a spell icon in the open list",
+		#warrior == 3 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
+		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Skip this class", 1, true) and warrior[3].label:find("|T", 1, true))
+	check("menu items carry their value, and the closed dropdown shows only the icon",
+		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and dds[10].selTranslator ~= nil
+		and dds[10].selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
+	check("the class default is the selected item (Warrior -> Might)", warrior[1].selected and not warrior[2].selected)
+	check("Hunter defaults to Wisdom, Rogue to Might", ns.AssignedKey("HUNTER") == "WISDOM" and ns.AssignedKey("ROGUE") == "MIGHT")
+	warrior[2].pick()
+	-- row order: picking "Skip" on each class row in turn must hit the classes alphabetically
+	do
+		local saved = WM.db.assign
+		WM.db.assign = {}
+		local order = {}
+		for i = 2, 10 do
+			menuOf(dds[i])[3].pick()
+			for k in pairs(WM.db.assign) do
+				local seen = false
+				for _, o in ipairs(order) do if o == k then seen = true end end
+				if not seen then order[#order + 1] = k end
+			end
+		end
+		check("class rows are alphabetical (Druid ... Warrior)", table.concat(order, ",") == "DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR")
+		WM.db.assign = saved
+	end
+	check("picking Wisdom for Warrior saves it", WM.db.assign.WARRIOR == "WISDOM" and menuOf(dds[10])[2].selected)
+	menuOf(dds[11])[3].pick()
+	check("the 'class unreadable' dropdown saves to unknownClass", WM.db.unknownClass == "NONE")
+	WM.db.radius, WM.db.assign.WARRIOR, WM.db.unknownClass = 0, nil, "WISDOM"     -- leave the settings as found
+
 	-- report
 	W.groupSize = 1
 	addUnit(W, "party1", { class = "WARRIOR", name = "Wally", guid = "G-wally", dist = 8 })
@@ -634,6 +688,17 @@ do
 		r:find("ELIGIBLE #1", 1, true) and r:find("<== next press", 1, true) and r:find("already has Blessing of Wisdom", 1, true))
 	check("report notes the nameplate CVar and bound key", r:find("nameplateShowFriendlyPlayers", 1, true) and r:find("Key Bindings > WellMet", 1, true))
 	check("ShowLog builds the window", pcall(function() WM:ShowLog() end))
+	do   -- the window's Clear log button empties the log, rebuilds the report and says so
+		WM:Log("a line that should disappear")
+		check("log has the line before clearing", (WM:BuildReport()):find("a line that should disappear", 1, true) ~= nil)
+		local clearBtn
+		for _, f in ipairs(E.frames) do if f.text == "Clear log" then clearBtn = f end end
+		check("the window has a Clear log button", clearBtn ~= nil)
+		W.prints = {}
+		clearBtn.scripts.OnClick(clearBtn)
+		check("Clear log empties the log", #ns.LogLines() == 0 and not WM.logFrame.edit.orig:find("a line that should disappear", 1, true))
+		check("Clear log confirms in chat", printed(W, "log cleared"))
+	end
 
 	-- log ring buffer
 	ns.ClearLog()

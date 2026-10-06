@@ -158,6 +158,7 @@ local function buildWindow()
 	end)
 	eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); f:Hide() end)
 	f.edit = eb
+	f.scroll = sf
 
 	local function button(text, point, x, fn)
 		local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
@@ -168,12 +169,16 @@ local function buildWindow()
 		return b
 	end
 	button("Refresh", "BOTTOMLEFT", 16, function() WM:ShowLog() end)
-	button("Clear log", "BOTTOMLEFT", 136, function() ns.ClearLog(); WM:ShowLog() end)
+	button("Clear log", "BOTTOMLEFT", 136, function()
+		ns.ClearLog()
+		WM:ShowLog(true)     -- jump to the bottom, where the (now empty) event log is
+		WM:Print("log cleared")
+	end)
 	button("Close", "BOTTOMRIGHT", -16, function() f:Hide() end)
 	return f
 end
 
-function WM:ShowLog()
+function WM:ShowLog(scrollToEnd)
 	if not WM.logFrame then WM.logFrame = buildWindow() end
 	local f = WM.logFrame
 	local text = WM:BuildReport()
@@ -183,4 +188,8 @@ function WM:ShowLog()
 	f:Show()
 	f.edit:SetFocus()
 	f.edit:HighlightText()
+	if scrollToEnd then
+		-- the scroll range is only updated after the new text is laid out
+		C_Timer.After(0, function() f.scroll:SetVerticalScroll(f.scroll:GetVerticalScrollRange()) end)
+	end
 end

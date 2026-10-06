@@ -9,7 +9,7 @@ local ADDON, ns = ...
 local WM = ns.WM
 
 local ICON = "Interface\\AddOns\\WellMet\\Icons\\Icon"
-local RADIUS = 80
+local RIM = 5        -- how far past the minimap's edge the button's centre sits (on the border art)
 
 function WM:CreateMinimap()
 	local b = CreateFrame("Button", "WellMetMinimap", Minimap)
@@ -31,7 +31,8 @@ function WM:CreateMinimap()
 	local function reposition()
 		local angle = math.rad(WM.db.minimap.angle)
 		b:ClearAllPoints()
-		b:SetPoint("CENTER", Minimap, "CENTER", RADIUS * math.cos(angle), RADIUS * math.sin(angle))
+		local radius = Minimap:GetWidth() / 2 + RIM      -- follows the minimap's real size (198 px on Forever)
+		b:SetPoint("CENTER", Minimap, "CENTER", radius * math.cos(angle), radius * math.sin(angle))
 	end
 	reposition()
 

@@ -25,6 +25,14 @@ function ns.SpellId(buff)
 	return info and info.spellID or nil
 end
 
+-- The spell's icon (a file id) for the settings UI. A spell the player doesn't know yet still has
+-- an icon; if the client can't resolve the name at all, the generic question-mark icon.
+local QUESTION_MARK_ICON = 134400
+function ns.SpellIcon(buff)
+	local info = C_Spell.GetSpellInfo(buff.name)
+	return info and info.iconID or QUESTION_MARK_ICON
+end
+
 function ns.IsKnown(buff)
 	local id = ns.SpellId(buff)
 	return id ~= nil and C_SpellBook.IsSpellKnown(id) and true or false

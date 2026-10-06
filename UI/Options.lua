@@ -7,17 +7,35 @@ Right column: which blessing goes on which target class (Paladin).
 local ADDON, ns = ...
 local WM = ns.WM
 
-local ASSIGN_LABEL = { MIGHT = "Might", WISDOM = "Wisdom", NONE = "Skip" }
-local ASSIGN_CYCLE = { "MIGHT", "WISDOM", "NONE" }
-local RADIUS_CYCLE = { 0, 28, 10 }
-local RADIUS_LABEL = { [0] = "Cast range (max)", [28] = "28 yards", [10] = "10 yards" }
+local ICON_SIZE = 20
+local SKIP_ICON = "Interface\\Buttons\\UI-GroupLoot-Pass-Up"     -- the red "pass" cross
 
-local function cycle(list, current)
-	for i, v in ipairs(list) do
-		if v == current then return list[i % #list + 1] end
-	end
-	return list[1]
+local function iconText(texture)
+	return ("|T%s:%d|t"):format(tostring(texture), ICON_SIZE)
 end
+
+-- Assignment choices for a target class: the Paladin blessings (icon + name in the open list),
+-- and "Skip". The closed dropdown shows just the icon (assignIcon).
+local function assignOptions()
+	local options = {}
+	local caster = ns.CasterData.PALADIN
+	for _, key in ipairs(caster.order) do
+		local buff = caster.buffs[key]
+		options[#options + 1] = { value = key, label = iconText(ns.SpellIcon(buff)) .. " " .. buff.name }
+	end
+	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. " Skip this class" }
+	return options
+end
+
+local function assignIcon(value)
+	if value == "NONE" then return iconText(SKIP_ICON) end
+	return iconText(ns.SpellIcon(ns.CasterData.PALADIN.buffs[value]))
+end
+local RADIUS_OPTIONS = {
+	{ value = 0,  label = "Cast range (max)" },
+	{ value = 28, label = "28 yards" },
+	{ value = 10, label = "10 yards" },
+}
 
 local function className(class)
 	return (_G.LOCALIZED_CLASS_NAMES_MALE and _G.LOCALIZED_CLASS_NAMES_MALE[class]) or class
@@ -49,6 +67,26 @@ local function makeButton(parent, text, width, x, y, onClick)
 	b:SetText(text)
 	b:SetScript("OnClick", onClick)
 	return b
+end
+
+-- Stock Blizzard dropdown: click, pick one of `options` ({ value, label }). The closed dropdown shows
+-- the selected label. `dd.refresh()` re-reads `get()` (for the panel's refresh pass).
+-- `options` may be a function (re-evaluated whenever the menu is built). `closedText(value)` optionally
+-- changes what the CLOSED dropdown shows for the selected value (e.g. just an icon).
+local function makeDropdown(parent, width, x, y, options, get, set, closedText)
+	local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+	dd:SetPoint("TOPLEFT", x, y)
+	dd:SetWidth(width)
+	if closedText then
+		dd:SetSelectionTranslator(function(selection) return closedText(selection.data) end)
+	end
+	dd:SetupMenu(function(_, root)
+		for _, o in ipairs(type(options) == "function" and options() or options) do
+			root:CreateRadio(o.label, function() return get() == o.value end, function() set(o.value) end, o.value)
+		end
+	end)
+	dd.refresh = function() dd:GenerateMenu() end
+	return dd
 end
 
 local function makeHeader(parent, text, x, y)
@@ -103,14 +141,12 @@ function WM:CreateOptions()
 	check("Group members first", "groupFirst")
 	check("Buff myself too (first)", "includeSelf")
 
-	local radiusBtn = makeButton(panel, "", 200, LX + 8, y, function(self)
-		WM.db.radius = cycle(RADIUS_CYCLE, WM.db.radius)
-		for _, r in ipairs(refreshers) do r() end
-	end)
+	local radiusDD = makeDropdown(panel, 170, LX + 8, y, RADIUS_OPTIONS,
+		function() return WM.db.radius end, function(v) WM.db.radius = v end)
+	refreshers[#refreshers + 1] = radiusDD.refresh
 	local radiusNote = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-	radiusNote:SetPoint("LEFT", radiusBtn, "RIGHT", 8, 0)
+	radiusNote:SetPoint("LEFT", radiusDD, "RIGHT", 8, 0)
 	radiusNote:SetText("search radius")
-	refreshers[#refreshers + 1] = function() radiusBtn:SetText(RADIUS_LABEL[WM.db.radius] or tostring(WM.db.radius)) end
 	y = y - 34
 
 	local npStatus = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
@@ -147,28 +183,25 @@ function WM:CreateOptions()
 	-- Right column: assignments
 	local ry = -64
 	makeHeader(panel, "Which blessing on which class", RX, ry); ry = ry - 28
-	local assignButtons = {}
 	local function assignRow(class, label)
 		local text = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 		text:SetPoint("TOPLEFT", RX + 8, ry - 4)
 		text:SetText(label)
-		local b = makeButton(panel, "", 110, RX + 160, ry, function()
-			local current = class and ns.AssignedKey(class) or WM.db.unknownClass
-			local nextKey = cycle(ASSIGN_CYCLE, current)
-			if class then WM.db.assign[class] = nextKey else WM.db.unknownClass = nextKey end
-			for _, r in ipairs(refreshers) do r() end
-		end)
-		refreshers[#refreshers + 1] = function()
-			b:SetText(ASSIGN_LABEL[class and ns.AssignedKey(class) or WM.db.unknownClass] or "?")
-		end
-		ry = ry - 28
+		local dd = makeDropdown(panel, 70, RX + 120, ry + 2, assignOptions,
+			function() return class and ns.AssignedKey(class) or WM.db.unknownClass end,
+			function(v) if class then WM.db.assign[class] = v else WM.db.unknownClass = v end end,
+			assignIcon)
+		refreshers[#refreshers + 1] = dd.refresh
+		ry = ry - 30
 	end
-	for _, class in ipairs(ns.TargetClasses) do assignRow(class, classColored(class)) end
+	local classes = { unpack(ns.TargetClasses) }
+	table.sort(classes, function(a, b) return className(a):lower() < className(b):lower() end)      -- alphabetical by displayed name
+	for _, class in ipairs(classes) do assignRow(class, classColored(class)) end
 	assignRow(nil, "|cffaaaaaaClass unreadable|r")
 	local help = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	help:SetPoint("TOPLEFT", RX + 8, ry - 6)
 	help:SetWidth(280); help:SetJustifyH("LEFT")
-	help:SetText("Click a button to cycle Might / Wisdom / Skip. \"Class unreadable\" is used when the game hides a stranger's class.")
+	help:SetText("Pick the blessing for each class (open the list to see names). \"Class unreadable\" is used when the game hides a stranger's class.")
 
 	----------------------------------------------------------------
 	panel:SetScript("OnShow", function() for _, r in ipairs(refreshers) do r() end end)

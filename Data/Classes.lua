@@ -28,7 +28,7 @@ ns.CasterData = {
 
 -- Default blessing per target class (all editable in settings). "NONE" skips the class.
 ns.DefaultAssign = {
-	WARRIOR = "MIGHT", ROGUE = "MIGHT", HUNTER = "MIGHT",
-	PALADIN = "WISDOM", PRIEST = "WISDOM", SHAMAN = "WISDOM",
+	WARRIOR = "MIGHT", ROGUE = "MIGHT",
+	HUNTER = "WISDOM", PALADIN = "WISDOM", PRIEST = "WISDOM", SHAMAN = "WISDOM",
 	MAGE = "WISDOM", WARLOCK = "WISDOM", DRUID = "WISDOM",
 }
