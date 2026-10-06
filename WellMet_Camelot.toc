@@ -2,8 +2,11 @@
 ## Title: WellMet
 ## Notes: One key buffs the next nearby player who needs it. Built for WoW Forever.
 ## Author: tek
-## Version: 0.1.0
+## Version: 0.1.0-beta.1
 ## DefaultState: enabled
+## X-Curse-Project-ID: 1730687
+## X-License: MIT
+## X-Website: https://github.com/tekHudson/WellMet
 ## IconTexture: Interface\AddOns\WellMet\Icons\Icon
 ## SavedVariables: WellMetDB
 
@@ -20,7 +23,6 @@ Core\Discovery.lua
 Core\Select.lua
 Core\Cast.lua
 Core\Macro.lua
-Core\Probe.lua
 Core\Debug.lua
 UI\Options.lua
 UI\Minimap.lua

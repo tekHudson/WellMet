@@ -23,7 +23,7 @@ local function newWorld()
 		now = 1000, combat = false, mounted = false, flying = false, taxi = false,
 		restricted = false, raid = false, groupSize = 0,
 		cvars = { nameplateShowFriendlyPlayers = "1" },
-		units = {}, plates = {}, known = {}, spells = {}, macros = {}, sent = {},
+		units = {}, plates = {}, known = {}, spells = {}, macros = {},
 		bindings = {},           -- key -> action (pre-existing bindings)
 		overrides = {},          -- key -> action set by addon
 		prints = {}, sentCalls = 0,
@@ -78,15 +78,7 @@ local function newEnv(W)
 	g.IsFlying = function() return W.flying end
 	g.UnitOnTaxi = function() return W.taxi end
 	g.IsInRaid = function() return W.raid end
-	g.IsInGroup = function() return W.groupSize > 0 end
-	g.IsInInstance = function() return W.inInstance or false, W.inInstance and "party" or "none" end
-	g.C_ChatInfo = {
-		InChatMessagingLockdown = function() return W.lockdown or false end,
-		SendChatMessage = function(msg, chatType)
-			if W.sendError then error(W.sendError) end
-			W.sent[#W.sent + 1] = { msg = msg, chatType = chatType }
-		end,
-	}
+
 	g.GetNumGroupMembers = function() return W.groupSize end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
@@ -1056,70 +1048,6 @@ do
 	WM4:CreateMacro()
 	check("in combat: no macro is made", W4.macros[1] == nil and printed(W4, "combat"))
 	E4.g.SlashCmdList.WELLMET("macro")
-end
-
-----------------------------------------------------------------------
-print("== Chat probe")
-do
-	local WM, ns, E, W = load({ debug = false })
-	local slash = E.g.SlashCmdList.WELLMET
-	check("debug is off to begin with", WM.db.debug == false)
-	slash("probe")
-	check("/wellmet probe turns debug on (its findings are log lines) and listens to party, raid and instance chat",
-		WM.db.debug == true)
-	local chatFrame
-	for _, f in ipairs(E.frames) do local ev = rawget(f, "events"); if ev and ev.CHAT_MSG_PARTY then chatFrame = f end end
-	check("...registering all six chat events", chatFrame and chatFrame.events.CHAT_MSG_PARTY_LEADER and chatFrame.events.CHAT_MSG_RAID
-		and chatFrame.events.CHAT_MSG_RAID_LEADER and chatFrame.events.CHAT_MSG_INSTANCE_CHAT and chatFrame.events.CHAT_MSG_INSTANCE_CHAT_LEADER)
-
-	-- a readable message is logged with its text; a secret one is logged as SECRET
-	W.lockdown = false
-	chatFrame.scripts.OnEvent(chatFrame, "CHAT_MSG_PARTY", "!buff might", "Bob", "", "", "", "", 0, 0, "", 0, 1, "Player-1-bob")
-	addUnit(W, "hidden", { secretGuid = true })
-	local SECRET = E.g.UnitGUID("hidden")
-	W.lockdown = true; W.inInstance = true
-	chatFrame.scripts.OnEvent(chatFrame, "CHAT_MSG_RAID", SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 2, SECRET)
-	local report = WM:BuildReport()
-	check("a readable party message is logged with text, sender and guid, and the lockdown state",
-		report:find("probe chat CHAT_MSG_PARTY text=!buff might sender=Bob guid=Player-1-bob lockdown=false instance=false(none)", 1, true) ~= nil)
-	check("a secret raid message is logged as SECRET (text, sender and guid), with lockdown=true and the instance type",
-		report:find("probe chat CHAT_MSG_RAID text=SECRET sender=SECRET guid=SECRET lockdown=true instance=true(party)", 1, true) ~= nil)
-	W.lockdown = false; W.inInstance = false
-
-	-- sending
-	W.groupSize = 0
-	slash("probe send")
-	check("send with no group: nothing is sent, and it says why", #W.sent == 0 and printed(W, "Join a party"))
-	W.groupSize = 2
-	slash("probe send")
-	check("send in a party: one line goes to PARTY and the result is logged",
-		#W.sent == 1 and W.sent[1].chatType == "PARTY" and W.sent[1].msg:find("%[WellMet%] chat probe %(slash command%)") ~= nil
-		and WM:BuildReport():find("probe send slash command PARTY ok", 1, true) ~= nil)
-	W.raid = true
-	slash("probe send")
-	check("in a raid it goes to RAID", W.sent[2] and W.sent[2].chatType == "RAID")
-	W.raid = false
-	W.sendError = "chat restricted"
-	slash("probe send")
-	check("a refused send is caught and the error is logged", WM:BuildReport():find("probe send slash command PARTY ERROR", 1, true) ~= nil and #W.sent == 2)
-	W.sendError = nil
-
-	-- the next press sends (a key press, then a macro press), exactly once
-	local btn = E.g.WellMetCast
-	slash("probe press")
-	btn.scripts.PreClick(btn, "LeftButton", true)
-	check("probe press: the next KEY press sends one line", #W.sent == 3 and W.sent[3].msg:find("(key press)", 1, true) ~= nil)
-	btn.scripts.PreClick(btn, "LeftButton", false)
-	check("...and only that one press (the key's release does not send again)", #W.sent == 3)
-	slash("probe press")
-	W.now = W.now + 100
-	btn.scripts.PreClick(btn, "LeftButton", false)
-	check("probe press: a MACRO press (an up click) sends and is labelled as a macro press", #W.sent == 4 and W.sent[4].msg:find("(macro press)", 1, true) ~= nil)
-	check("a press when not armed sends nothing", (function() btn.scripts.PreClick(btn, "LeftButton", true); return #W.sent == 4 end)())
-
-	-- stop listening
-	slash("probe")
-	check("a second /wellmet probe stops listening", not chatFrame.events.CHAT_MSG_PARTY and not chatFrame.events.CHAT_MSG_RAID)
 end
 
 ----------------------------------------------------------------------

@@ -1,0 +1,40 @@
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "**"   # any tag, e.g. v0.1.0-beta.1 (a tag containing "beta" or "alpha" uploads as a beta / alpha file)
+
+permissions:
+  contents: write   # allows creating the GitHub release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the packager can read tags
+
+      # Pinned to v2.6.1: the first packager release that knows Forever (Interface 16xxx -> the "forever" game
+      # type, CurseForge game version type 88568). Older versions mislabel Forever as Retail.
+      - name: Package and release
+        uses: BigWigsMods/packager@e50a250f8705041e40f2fa1ddcb280a686d65aa0  # v2.6.1
+        with:
+          args: -n "{package-name}-{project-version}"
+        env:
+          CF_API_KEY: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Notify Discord
+        if: success() && env.DISCORD_WEBHOOK_URL != ''
+        env:
+          REPO: ${{ github.event.repository.name }}
+          TAG: ${{ github.ref_name }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+        run: |
+          payload=$(jq -n --arg content "**$REPO** $TAG released: $RELEASE_URL" '{content: $content}')
+          curl -sS -X POST -H "Content-Type: application/json" -d "$payload" "$DISCORD_WEBHOOK_URL"

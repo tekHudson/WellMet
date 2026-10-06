@@ -2,6 +2,8 @@
 
 One key buffs the next nearby player who needs it. Built for **WoW Forever** (Interface 16001).
 
+> **Beta.** This is an early test release (0.1.0-beta.1). It only works on the WoW Forever beta client.
+
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.
 
@@ -41,3 +43,28 @@ has a button to turn them on).
 
 - Out of combat only: Forever hides aura information in combat, so WellMet can't tell who needs a buff.
 - Strangers' distance is only known roughly (about 10 / 28 yards); group members are exact.
+
+## Install
+
+- **CurseForge:** install WellMet from its CurseForge page with your addon manager.
+- **By hand:** download the zip from the [GitHub releases](https://github.com/tekHudson/WellMet/releases) and unzip the
+  `WellMet` folder into your Forever `Interface/AddOns` folder.
+
+## Bugs and feedback
+
+Open an [issue](https://github.com/tekHudson/WellMet/issues). Turn on `/wellmet debug`, press the key once, and paste
+what `/wellmet log` shows: that makes most problems quick to find.
+
+## Development
+
+The logic is tested without the game: `luajit tests/run.lua` (or `lua tests/run.lua`). The tests prove the logic, not the
+live client; `tests/TEST_PLAN.md` lists what has to be checked in game.
+
+## License and credits
+
+[MIT](LICENSE), copyright 2026 Tek Hudson. You are free to use, change and share it, as long as you keep the copyright
+notice and the license text.
+
+The "WM" lettering in the icon is rendered in IM Fell English SC (SIL Open Font License); only the rendered image is
+included. WellMet's approach to targeting strangers by name was learned from how NearbyBuff behaves in game. No code was
+copied.

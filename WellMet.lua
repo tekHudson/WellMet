@@ -152,8 +152,6 @@ function WM:SetupSlash()
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
 		elseif command == "macro" then
 			WM:CreateMacro()
-		elseif command == "probe" then
-			WM:Probe(arg)
 		else
 			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
