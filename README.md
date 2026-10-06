@@ -5,9 +5,14 @@ One key buffs the next nearby player who needs it. Built for **WoW Forever** (In
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.
 
-**Paladin** (Blessing of Might / Wisdom, one per class) and **Mage** (Arcane Intellect, plus optional Dampen /
-Amplify Magic, ticked per class) so far. Priest and Druid are planned. On a character whose class has no buffs
-(Warrior, Rogue, ...) WellMet does nothing at all: no messages, no settings, no minimap button.
+**Paladin** (Blessing of Might / Wisdom, one per class), **Mage** (Arcane Intellect, plus optional Dampen /
+Amplify Magic, ticked per class) so far. **Warlock, Priest, Shaman, Hunter and Warrior** keep up their own buffs only
+(Warlock/Mage armor, Inner Fire, Lightning/Water Shield, an Aspect, Battle Shout). Priest and Druid group buffs are planned.
+
+It also keeps **your own buffs** up with the same key, before anyone else: a Paladin's aura (and optionally Righteous
+Fury), a Mage's armor, a Warlock's armor, a Priest's Inner Fire, a Shaman's shield, a Hunter's aspect, a Warrior's shout. Pick them under *Yourself* in the settings; "best learned" uses Ice Armor
+over Frost Armor, Demon Armor over Demon Skin. On a character whose class has no buffs
+(Rogue, Druid for now) WellMet does nothing at all: no messages, no settings, no minimap button.
 
 ## Use
 

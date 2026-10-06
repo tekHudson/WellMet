@@ -171,7 +171,7 @@ local function newEnv(W)
 	g.Settings = {
 		RegisterCanvasLayoutCategory = function() return { GetID = function() return 1 end } end,
 		RegisterAddOnCategory = function() end,
-		OpenToCategory = function(id) W.openedCategory = id end,
+		OpenToCategory = function(id, section) W.openedCategory = id; W.openedSection = section end,
 	}
 	return E
 end
@@ -273,7 +273,7 @@ do
 		}
 	end
 	local function settings(over)
-		local s = { assign = {}, unknownClass = "WISDOM", strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
+		local s = { assign = {}, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
 		for k, v in pairs(over or {}) do s[k] = v end
 		return s
 	end
@@ -327,8 +327,8 @@ do
 	check("assignment override is honored", best.buff.key == "WISDOM")
 	_, skipped = Select.Pick({ cand("w", 2, "WARRIOR") }, ctx(nil, settings({ assign = { WARRIOR = "NONE" } })))
 	check("a class set to Skip is skipped", skipped[1] and skipped[1].reason:find("skip this class", 1, true) ~= nil)
-	best = Select.Pick({ cand("?", 2, nil) }, ctx(nil, settings({ unknownClass = "MIGHT" })))
-	check("unreadable class uses the 'unknown class' default", best.buff.key == "MIGHT")
+	best, skipped = Select.Pick({ cand("?", 2, nil) }, ctx())
+	check("a person whose class can't be read is skipped, with a reason", best == nil and skipped[1].reason:find("class not readable", 1, true) ~= nil)
 
 	-- rotation memory
 	Select.Reset()
@@ -607,13 +607,13 @@ do
 	local function cand(key, class, order) return { unit = key, key = key, name = key, tier = 2, class = class, order = order or 1 } end
 	local probe = { known = function() return true end, inRange = function() return true end, lacks = function() return true end, distance = function() return nil end }
 	local function ctx(settings) return { now = 100, settings = settings, caster = WM.caster, probe = probe } end
-	local s = { assign = {}, stack = {}, unknownClass = "WISDOM", strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
+	local s = { assign = {}, stack = {}, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
 
 	local best, skipped, eligible = Select.Pick({ cand("w", "WARRIOR"), cand("p", "PRIEST") }, ctx(s))
 	check("Intellect goes on a mana class by default, not on a Warrior",
 		best.cand.key == "p" and best.buff.key == "INTELLECT" and #eligible == 1 and skipped[1].reason:find("no buffs are switched on", 1, true) ~= nil)
 	best = Select.Pick({ cand("?", nil) }, ctx(s))
-	check("an unreadable class gets Intellect by default", best and best.buff.key == "INTELLECT")
+	check("Mage: a person whose class can't be read is skipped", best == nil)
 	best = Select.Pick({ cand("r", "ROGUE") }, ctx(s))
 	check("Rogue gets nothing by default", best == nil)
 
@@ -653,10 +653,11 @@ do
 		printed(W, "Nobody nearby needs Arcane Intellect.") and not printed(W, "Dampen"))
 	W.units.player.auras = {}
 
-	-- settings: one multi-select dropdown per class (11 = radius + 9 classes + unreadable)
+	-- settings: one multi-select dropdown per class (10 = radius + 9 classes)
 	local dds = {}
 	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
-	check("Mage settings have 11 dropdowns (radius + 9 classes + unreadable)", #dds == 11)
+	local nSelf = #WM.caster.selfCategories      -- the "Yourself" dropdown(s) sit between the radius and the class rows
+	check("Mage settings have the self dropdown + radius + 9 classes", nSelf == 1 and #dds == nSelf + 10)
 	local function checklist(dd)
 		local items = {}
 		dd.menuGen(dd, { CreateCheckbox = function(_, label, isSelected, toggle, data)
@@ -666,20 +667,20 @@ do
 		end })
 		return items
 	end
-	local priest = checklist(dds[6])      -- Druid, Hunter, Mage, Paladin, Priest -> 6th dropdown (1st is the radius)
+	local priest = checklist(dds[nSelf + 6])      -- Druid, Hunter, Mage, Paladin, Priest -> 6th dropdown (1st is the radius)
 	check("a class dropdown lists the three buffs with icons; Intellect is ticked by default",
 		#priest == 3 and priest[1].label:find("|T1001459:", 1, true) and priest[1].label:find("Arcane Intellect", 1, true) and priest[1].on and not priest[2].on and not priest[3].on)
 	priest[2].toggle()
-	check("ticking Dampen Magic saves it", checklist(dds[6])[2].on and ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
-	checklist(dds[6])[3].toggle()
-	check("ticking Amplify Magic unticks Dampen Magic", checklist(dds[6])[3].on and not checklist(dds[6])[2].on)
+	check("ticking Dampen Magic saves it", checklist(dds[nSelf + 6])[2].on and ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
+	checklist(dds[nSelf + 6])[3].toggle()
+	check("ticking Amplify Magic unticks Dampen Magic", checklist(dds[nSelf + 6])[3].on and not checklist(dds[nSelf + 6])[2].on)
 	check("the closed dropdown shows the icons of what is ticked",
-		dds[6].selText({ { data = "INTELLECT" }, { data = "AMPLIFY" } }) == "|T1001459:20|t|T1001008:20|t" and dds[6].selText({}):find("none", 1, true) ~= nil)
+		dds[nSelf + 6].selText({ { data = "INTELLECT" }, { data = "AMPLIFY" } }) == "|T1001459:20|t|T1001008:20|t" and dds[nSelf + 6].selText({}):find("none", 1, true) ~= nil)
 	WM.db.stack = {}
 
 	-- a spell the player hasn't learned: its own icon (from the data), greyed, with an "Unknown" tooltip
 	W.known[1008] = nil; W.spells["Amplify Magic"] = nil
-	local unk = checklist(dds[6])
+	local unk = checklist(dds[nSelf + 6])
 	check("an unlearned buff keeps its real icon (from the data file), not a question mark",
 		unk[3].label:find("Spell_Holy_FlashHeal", 1, true) ~= nil and not unk[3].label:find("134400", 1, true))
 	check("...with the icon dimmed and the name greyed", unk[3].label:find(":110:110:110|t", 1, true) ~= nil and unk[3].label:find("|cff808080Amplify Magic|r", 1, true) ~= nil)
@@ -690,7 +691,166 @@ do
 	check("only the unlearned buff has a tooltip, and it says Unknown", unk[3].tooltip ~= nil and unk[1].tooltip == nil and unk[2].tooltip == nil)
 	unk[3].tooltip({})
 	check("the tooltip title is 'Unknown'", lines[1] == "Unknown")
-	check("the closed dropdown dims an unlearned buff's icon too", dds[6].selText({ { data = "AMPLIFY" } }):find("110:110:110", 1, true) ~= nil)
+	check("the closed dropdown dims an unlearned buff's icon too", dds[nSelf + 6].selText({ { data = "AMPLIFY" } }):find("110:110:110", 1, true) ~= nil)
+end
+
+----------------------------------------------------------------------
+print("== Self buffs (aura, armor)")
+do
+	local function learn(W, list) for name, id in pairs(list) do W.spells[name] = id; W.known[id] = true end end
+	local PALLY = { ["Devotion Aura"] = 465, ["Retribution Aura"] = 7294, ["Righteous Fury"] = 25780 }
+
+	-- Paladin: aura first, then the blessing on yourself
+	local WM, ns, E, W = load()
+	learn(W, PALLY)
+	W.groupSize = 0
+	W.units.player.auras = {}
+	local b = press(E)
+	check("Paladin: the first press casts the chosen aura (Devotion by default) on you", b.attrs.type == "spell" and b.attrs.spell == "Devotion Aura" and b.attrs.unit == "player")
+	W.units.player.auras = { ["Devotion Aura"] = true }
+	W.now = W.now + 100; ns.Select.Reset()
+	b = press(E)
+	check("...once you have it, the next press is the blessing on yourself", b.attrs.spell == "Blessing of Wisdom" and b.attrs.unit == "player")
+	WM.db.selfChoice.AURA = "RETRIBUTION"
+	W.now = W.now + 100; ns.Select.Reset()
+	b = press(E)
+	check("a different aura choice is used", b.attrs.spell == "Retribution Aura")
+	WM.db.selfChoice.AURA = "NONE"
+	W.now = W.now + 100; ns.Select.Reset()
+	b = press(E)
+	check("aura set to None: skipped", b.attrs.spell == "Blessing of Wisdom")
+	WM.db.selfChoice.AURA = nil
+	W.units.player.auras = { ["Devotion Aura"] = true }
+	W.now = W.now + 100; ns.Select.Reset()
+	check("Righteous Fury is off by default", press(E).attrs.spell == "Blessing of Wisdom")
+	WM.db.selfChoice.FURY = "RIGHTEOUS_FURY"
+	W.now = W.now + 100; ns.Select.Reset()
+	check("...and cast after the aura once it is chosen", press(E).attrs.spell == "Righteous Fury")
+	WM.db.selfChoice.FURY = nil
+	WM.db.includeSelf = false
+	W.now = W.now + 100; ns.Select.Reset()
+	W.units.player.auras = {}
+	check("'Buff myself' off also turns off the self buffs", press(E).attrs.type == nil)
+	WM.db.includeSelf = true
+	W.now = W.now + 100; ns.Select.Reset()
+	W.known[465] = nil
+	local best, skipped = ns.Select.Pick({ { unit = "player", key = "me", name = "Tek", tier = 0, class = "PALADIN", order = 0 } },
+		{ now = 100, settings = WM.db, caster = WM.caster, probe = ns.Probe })
+	check("an aura you haven't learned is skipped with a reason", best.buff.key == "WISDOM" and skipped[1].reason:find("Devotion Aura is not learned", 1, true) ~= nil)
+
+	-- Mage: the armor line resolves to the best learned one
+	local WMm, nsm, Em, Wm = load({ class = "MAGE", login = false })
+	learn(Wm, { ["Frost Armor"] = 168, ["Mage Armor"] = 6117 })
+	WMm:PLAYER_LOGIN(); WMm.db.debug = true
+	Wm.groupSize = 0
+	check("Mage: 'best learned' picks Frost Armor when Ice Armor isn't learned", press(Em).attrs.spell == "Frost Armor")
+	learn(Wm, { ["Ice Armor"] = 7302 })
+	Wm.now = Wm.now + 100; nsm.Select.Reset()
+	check("...and Ice Armor once it is learned", press(Em).attrs.spell == "Ice Armor")
+	WMm.db.selfChoice.ARMOR = "MAGE_ARMOR"
+	Wm.now = Wm.now + 100; nsm.Select.Reset()
+	check("a specific choice (Mage Armor) overrides 'best learned'", press(Em).attrs.spell == "Mage Armor")
+	WMm.db.selfChoice.ARMOR = nil
+	-- armor AND Intellect both learned and both missing: the armor must come first, then Intellect
+	learn(Wm, { ["Arcane Intellect"] = 1459 })
+	Wm.units.player.auras = {}
+	Wm.now = Wm.now + 100; nsm.Select.Reset()
+	local _, _, order = nsm.Select.Pick({ { unit = "player", key = "me", name = "Tek", tier = 0, class = "MAGE", order = 0 } },
+		{ now = 100, settings = WMm.db, caster = WMm.caster, probe = nsm.Probe })
+	check("Mage with nothing on: Ice Armor is listed before Arcane Intellect", #order == 2 and order[1].buff.key == "ICE_ARMOR" and order[2].buff.key == "INTELLECT")
+	Wm.now = Wm.now + 100; nsm.Select.Reset()
+	check("...and a press casts the armor first", press(Em).attrs.spell == "Ice Armor")
+	Wm.units.player.auras = { ["Ice Armor"] = true }
+	Wm.now = Wm.now + 100; nsm.Select.Reset()
+	check("with the armor on, the Mage moves on to Arcane Intellect or nothing (armor is not repeated)", press(Em).attrs.spell ~= "Ice Armor")
+
+	-- Warlock: only buffs itself; becomes a supported class
+	local WMw, nsw, Ew, Ww = load({ class = "WARLOCK", login = false })
+	learn(Ww, { ["Demon Skin"] = 687 })
+	WMw:PLAYER_LOGIN(); WMw.db.debug = true
+	check("Warlock is supported and only buffs itself", nsw.supported == true and WMw.caster.mode == "self" and #WMw.caster.order == 0)
+	addUnit(Ww, "nameplate1", { class = "PRIEST", name = "Stranger", guid = "G-s", interact = "mid", auras = {} })
+	Ww.plates = { "nameplate1" }
+	local bw = press(Ew)
+	check("Warlock: casts the best learned armor on itself, ignoring other players",
+		bw.attrs.type == "spell" and bw.attrs.spell == "Demon Skin" and bw.attrs.unit == "player")
+	Ww.units.player.auras = { ["Demon Skin"] = true }
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	Ww.prints = {}
+	check("Warlock with the armor on: nothing happens and says so", press(Ew).attrs.type == nil and printed(Ww, "Nothing needs buffing"))
+	local _, skipW = nsw.Select.Pick({ { unit = "nameplate1", key = "s", name = "S", tier = 2, class = "PRIEST", order = 1 } },
+		{ now = 100, settings = WMw.db, caster = WMw.caster, probe = nsw.Probe })
+	check("...and other players are not even listed as skipped", #skipW == 0)
+	learn(Ww, { ["Demon Armor"] = 706 })
+	Ww.units.player.auras = {}
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	check("Warlock: Demon Armor beats Demon Skin once learned", press(Ew).attrs.spell == "Demon Armor")
+	WMw.db.selfChoice.ARMOR = "NONE"
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	check("Warlock: armor set to None casts nothing", press(Ew).attrs.type == nil)
+	check("Forever has no Fel Armor or Sanctity Aura", WMw.caster.buffs.FEL_ARMOR == nil and WM.caster.buffs.SANCTITY == nil)
+
+	-- Priest, Shaman, Hunter, Warrior: their own buffs, nothing on other players
+	local function selfClass(class, spells)
+		local WMx, nsx, Ex, Wx = load({ class = class, login = false })
+		learn(Wx, spells)
+		WMx:PLAYER_LOGIN(); WMx.db.debug = true
+		Wx.groupSize = 0
+		return WMx, nsx, Ex, Wx
+	end
+	do
+		local WMp, nsp, Ep = selfClass("PRIEST", { ["Inner Fire"] = 588 })
+		check("Priest: supported, self only, casts Inner Fire on itself", nsp.supported and WMp.caster.mode == "self" and press(Ep).attrs.spell == "Inner Fire")
+		local WMs, nss, Es, Ws = selfClass("SHAMAN", { ["Lightning Shield"] = 324 })
+		check("Shaman: Lightning Shield by default", press(Es).attrs.spell == "Lightning Shield")
+		learn(Ws, { ["Water Shield"] = 408510 })
+		WMs.db.selfChoice.SHIELD = "WATER_SHIELD"
+		Ws.now = Ws.now + 100; nss.Select.Reset()
+		check("Shaman: Water Shield when chosen", press(Es).attrs.spell == "Water Shield")
+		local WMh, nsh, Eh, Wh = selfClass("HUNTER", { ["Aspect of the Monkey"] = 13163 })
+		check("Hunter: 'best learned' falls back to Aspect of the Monkey", press(Eh).attrs.spell == "Aspect of the Monkey")
+		learn(Wh, { ["Aspect of the Hawk"] = 13165, ["Aspect of the Cheetah"] = 5118 })
+		Wh.now = Wh.now + 100; nsh.Select.Reset()
+		check("Hunter: ...and Aspect of the Hawk once learned", press(Eh).attrs.spell == "Aspect of the Hawk")
+		WMh.db.selfChoice.ASPECT = "CHEETAH"
+		Wh.now = Wh.now + 100; nsh.Select.Reset()
+		check("Hunter: a chosen aspect (Cheetah) overrides", press(Eh).attrs.spell == "Aspect of the Cheetah")
+		local WMw2, nsw2, Ew2 = selfClass("WARRIOR", { ["Battle Shout"] = 6673 })
+		check("Warrior: supported, casts Battle Shout on itself", nsw2.supported and press(Ew2).attrs.spell == "Battle Shout" and press(Ew2).attrs.unit == "player")
+		check("Rogue and Druid still have nothing, so they stay unsupported",
+			select(2, load({ class = "ROGUE", login = false })).supported == false and select(2, load({ class = "DRUID", login = false })).supported == false)
+		check("none of the spells missing from Forever are in the data (Commanding Shout, Heart of the Lion, Viper, Falcon)",
+			not readFile("Data/Classes.lua"):find('name = "Commanding Shout"', 1, true) and not readFile("Data/Classes.lua"):find('name = "Aspect of the Viper"', 1, true)
+			and not readFile("Data/Classes.lua"):find('name = "Heart of the Lion"', 1, true) and not readFile("Data/Classes.lua"):find('name = "Aspect of the Falcon"', 1, true))
+	end
+
+	-- settings: a "Yourself" dropdown per category, before everything else
+	local dds = {}
+	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
+	local function menu(dd)
+		local items = {}
+		dd.menuGen(dd, { CreateRadio = function(_, label, isSelected, setSelected, data)
+			local item = { label = label, selected = isSelected(), pick = setSelected, data = data }
+			items[#items + 1] = item
+			return { SetTooltip = function(_, fn) item.tooltip = fn end }
+		end })
+		return items
+	end
+	-- placement: Yourself is in the right column (x past the left column), above the first class row
+	local selfPt, firstClassPt, radiusPt = dds[2].lastPoint, dds[3].lastPoint, dds[1].lastPoint
+	local fury2Pt, classPt = dds[3].lastPoint, dds[4].lastPoint
+	check("Yourself sits in the right column, above the class rows",
+		selfPt[2] > radiusPt[2] + 200 and selfPt[3] > classPt[3] and fury2Pt[3] < selfPt[3] and fury2Pt[3] > classPt[3])
+	local aura = menu(dds[2])      -- dds[1] is the radius
+	check("Paladin settings: the Aura dropdown lists the 6 auras plus None; Devotion is selected",
+		#aura == 7 and aura[1].data == "DEVOTION" and aura[1].selected and aura[7].data == "NONE")
+	check("...an unlearned aura (Devotion, forgotten above) is greyed with a tooltip; a learned one (Retribution) is plain",
+		aura[1].label:find("808080", 1, true) ~= nil and aura[1].tooltip ~= nil and not aura[2].label:find("808080", 1, true) and aura[2].tooltip == nil)
+	local fury = menu(dds[3])
+	check("Righteous Fury dropdown: the spell or None, None selected by default", #fury == 2 and fury[2].selected and fury[1].data == "RIGHTEOUS_FURY")
+	aura[3].pick()
+	check("picking an aura saves it", WM.db.selfChoice.AURA == "CONCENTRATION")
+	WM.db.selfChoice.AURA = nil
 end
 
 ----------------------------------------------------------------------
@@ -731,29 +891,49 @@ do
 	check("...and back on", WM.db.debug == true)
 	slash("")
 	check("/wellmet opens the settings panel", W.openedCategory == 1)
+
+	-- "Open Key Bindings": open the Key Bindings screen with the search box set to "WellMet", which matches only our binding
+	do
+		E.g.Settings.KEYBINDINGS_CATEGORY_ID = 99
+		local typed
+		E.g.SettingsPanel = { SearchBox = { SetText = function(_, text) typed = text end } }
+		W.openedCategory = nil
+		WM:OpenKeyBindings()
+		check("Open Key Bindings opens the Key Bindings category", W.openedCategory == 99)
+		check("...and searches for 'WellMet'", typed == "WellMet")
+		-- the game's search matches each typed word as a plain substring of a binding's NAME
+		local bindingName = E.g["BINDING_NAME_CLICK WellMetCast:LeftButton"]
+		check("our binding's name contains the search word, so the search finds it", bindingName:upper():find(typed:upper(), 1, true) ~= nil)
+		check("...and it is one word, so no other binding matches by accident (the search matches any typed word)", not typed:find("%s"))
+	end
 	check("options panel builds with stock templates", WM.optionsPanel ~= nil and WM.refreshOptions ~= nil)
 	check("refreshing the options runs without error", pcall(WM.refreshOptions))
 
-	-- dropdowns: 1 radius + 9 classes + "class unreadable", each listing its choices as radio items
+	-- dropdowns: 1 radius + 9 classes, each listing its choices as radio items
 	local function menuOf(dd)
 		local items = {}
-		dd.menuGen(dd, { CreateRadio = function(_, label, isSelected, setSelected, data) items[#items + 1] = { label = label, selected = isSelected(), pick = setSelected, data = data } end })
+		dd.menuGen(dd, { CreateRadio = function(_, label, isSelected, setSelected, data)
+			local item = { label = label, selected = isSelected(), pick = setSelected, data = data }
+			items[#items + 1] = item
+			return { SetTooltip = function(_, fn) item.tooltip = fn end }
+		end })
 		return items
 	end
 	local dds = {}
 	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
-	check("radius + 9 classes + unreadable = 11 dropdowns, no cycle buttons", #dds == 11 and not readFile("UI/Options.lua"):find("cycle(", 1, true))
-	local radius = menuOf(dds[1])
+	local nSelf = #WM.caster.selfCategories      -- the "Yourself" dropdowns sit between the radius and the class rows
+	check("self dropdowns + radius + 9 classes, no cycle buttons and no 'class unreadable' row", #dds == nSelf + 10 and not readFile("UI/Options.lua"):find("Class unreadable", 1, true) and not readFile("UI/Options.lua"):find("cycle(", 1, true))
+	local radius = menuOf(dds[1])          -- order: radius (left column), then Yourself, then the class rows (right column)
 	check("radius dropdown lists cast range / 28 / 10 and marks the saved one", #radius == 3 and radius[1].selected and not radius[2].selected)
 	radius[2].pick()
 	check("picking 28 yards saves it", WM.db.radius == 28)
-	local warrior = menuOf(dds[10])         -- classes are alphabetical, so Warrior is the last class row
+	local warrior = menuOf(dds[nSelf + 10])         -- classes are alphabetical, so Warrior is the last class row
 	check("a class dropdown lists Might / Wisdom / Skip, each with a spell icon in the open list",
 		#warrior == 3 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
 		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Skip this class", 1, true) and warrior[3].label:find("|T", 1, true))
 	check("menu items carry their value, and the closed dropdown shows only the icon",
-		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and dds[10].selTranslator ~= nil
-		and dds[10].selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
+		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and dds[nSelf + 10].selTranslator ~= nil
+		and dds[nSelf + 10].selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Might)", warrior[1].selected and not warrior[2].selected)
 	check("Hunter defaults to Wisdom, Rogue to Might", ns.AssignedKey("HUNTER") == "WISDOM" and ns.AssignedKey("ROGUE") == "MIGHT")
 	warrior[2].pick()
@@ -762,7 +942,7 @@ do
 		local saved = WM.db.assign
 		WM.db.assign = {}
 		local order = {}
-		for i = 2, 10 do
+		for i = nSelf + 2, nSelf + 10 do
 			menuOf(dds[i])[3].pick()
 			for k in pairs(WM.db.assign) do
 				local seen = false
@@ -773,10 +953,8 @@ do
 		check("class rows are alphabetical (Druid ... Warrior)", table.concat(order, ",") == "DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR")
 		WM.db.assign = saved
 	end
-	check("picking Wisdom for Warrior saves it", WM.db.assign.WARRIOR == "WISDOM" and menuOf(dds[10])[2].selected)
-	menuOf(dds[11])[3].pick()
-	check("the 'class unreadable' dropdown saves to unknownClass", WM.db.unknownClass == "NONE")
-	WM.db.radius, WM.db.assign.WARRIOR, WM.db.unknownClass = 0, nil, "WISDOM"     -- leave the settings as found
+	check("picking Wisdom for Warrior saves it", WM.db.assign.WARRIOR == "WISDOM" and menuOf(dds[nSelf + 10])[2].selected)
+	WM.db.radius, WM.db.assign.WARRIOR = 0, nil     -- leave the settings as found
 
 	-- report
 	W.groupSize = 1
@@ -813,7 +991,7 @@ do
 
 	-- a class with no buffs: WellMet does nothing at all
 	do
-		local WM2, ns2, E2, W2 = load({ class = "WARRIOR" })
+		local WM2, ns2, E2, W2 = load({ class = "ROGUE" })
 		check("a class with no buffs is not supported, and WellMet stays out of the way", ns2.supported == false and WM2 == nil and ns2.WM == nil)
 		check("...it creates no frames, button, settings, minimap button, slash commands or chat messages",
 			#E2.frames == 0 and E2.g.WellMetCast == nil and E2.g.WellMetMinimap == nil and E2.g.WellMetOptionsPanel == nil

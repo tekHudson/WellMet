@@ -1,7 +1,7 @@
 --[[ WellMet — settings panel (Blizzard Settings API canvas, stock templates only).
 
 Left column:  key, targeting, behavior.
-Right column: which blessing goes on which target class (Paladin).
+Right column: yourself (your own aura / armor / ...), then which buffs go on which target class.
 ]]
 
 local ADDON, ns = ...
@@ -50,6 +50,30 @@ local function assignIcon(caster, value)
 	if value == "NONE" then return iconText(SKIP_ICON) end
 	local buff = caster.buffs[value]
 	return iconText(ns.SpellIcon(buff), unknownBuff(buff))
+end
+
+-- A "Yourself" category (an aura, an armor): "best learned" (when the category has one), each choice, and None.
+local function selfOptions(caster, cat)
+	local options = {}
+	if cat.auto then
+		local shown, learned
+		for _, key in ipairs(cat.auto) do
+			shown = shown or caster.buffs[key]
+			if ns.IsKnown(caster.buffs[key]) then learned = caster.buffs[key]; break end
+		end
+		local buff = learned or shown
+		local dim = learned == nil
+		options[#options + 1] = {
+			value = "AUTO", unknown = dim,
+			label = iconText(ns.SpellIcon(buff), dim) .. " " .. (dim and ("|cff808080" .. cat.autoLabel .. "|r") or cat.autoLabel),
+		}
+	end
+	for _, key in ipairs(cat.choices) do
+		local buff = caster.buffs[key]
+		options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
+	end
+	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. " None" }
+	return options
 end
 
 -- Stack mode (Mage): one checkbox per buff; the closed dropdown shows the icons of the buffs that are on.
@@ -174,9 +198,7 @@ function WM:CreateOptions()
 	makeHeader(panel, "Key", LX, y); y = y - 28
 	local keyLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 	keyLabel:SetPoint("TOPLEFT", LX + 8, y - 4)
-	makeButton(panel, "Open Key Bindings", 150, LX + 150, y, function()
-		Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID, BINDING_HEADER_WELLMET)
-	end)
+	makeButton(panel, "Open Key Bindings", 150, LX + 150, y, function() WM:OpenKeyBindings() end)
 	refreshers[#refreshers + 1] = function()
 		local k1, k2 = GetBindingKey(ns.CLICK_ACTION)
 		keyLabel:SetText("Key: " .. (k1 and ("|cff66ff66" .. k1 .. (k2 and (", " .. k2) or "") .. "|r") or "|cffaaaaaanot set|r"))
@@ -235,8 +257,26 @@ function WM:CreateOptions()
 	----------------------------------------------------------------
 	-- Right column: which buffs go on which target class (depends on the player's class)
 	local ry = -64
+
+	-- Your own buffs (auras, armors): cast on yourself first, one choice per category. Above the class table.
+	if #WM.caster.selfCategories > 0 then
+		makeHeader(panel, "Yourself", RX, ry); ry = ry - 28
+		for _, cat in ipairs(WM.caster.selfCategories) do
+			local label = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+			label:SetPoint("TOPLEFT", RX + 8, ry - 4)
+			label:SetText(cat.title)
+			local dd = makeDropdown(panel, 170, RX + 118, ry + 2, function() return selfOptions(WM.caster, cat) end,
+				function() return WM.db.selfChoice[cat.key] or cat.default end,
+				function(v) WM.db.selfChoice[cat.key] = v end)
+			refreshers[#refreshers + 1] = dd.refresh
+			ry = ry - 30
+		end
+		ry = ry - 14
+	end
+
 	local caster = WM.caster
-	makeHeader(panel, caster.title, RX, ry); ry = ry - 28
+	if caster.mode == "self" then caster = nil end          -- nothing is cast on other players: no class table
+	if caster then makeHeader(panel, caster.title, RX, ry); ry = ry - 28 end
 
 	local function classRow(class, label, addControl)
 		local text = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
@@ -249,12 +289,11 @@ function WM:CreateOptions()
 	local help = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
 	help:SetWidth(280); help:SetJustifyH("LEFT")
 
-	do
+	if caster then
 		local classes = { unpack(ns.TargetClasses) }
 		table.sort(classes, function(a, b) return className(a):lower() < className(b):lower() end)      -- alphabetical by displayed name
 		local rows = {}
 		for _, class in ipairs(classes) do rows[#rows + 1] = { class = class, label = classColored(class) } end
-		rows[#rows + 1] = { class = nil, label = "|cffaaaaaaClass unreadable|r" }
 
 		for _, row in ipairs(rows) do
 			local class = row.class
@@ -279,17 +318,17 @@ function WM:CreateOptions()
 			else
 				classRow(class, row.label, function(x, y)
 					return makeDropdown(panel, 70, x, y, function() return assignOptions(caster) end,
-						function() return class and ns.AssignedKey(class) or WM.db.unknownClass end,
-						function(v) if class then WM.db.assign[class] = v else WM.db.unknownClass = v end end,
+						function() return ns.AssignedKey(class) end,
+						function(v) WM.db.assign[class] = v end,
 						function(value) return assignIcon(caster, value) end)
 				end)
 			end
 		end
 		help:SetPoint("TOPLEFT", RX + 8, ry - 6)
 		if caster.mode == "stack" then
-			help:SetText("Tick the buffs for each class (open the list to see names). Dampen and Amplify Magic replace each other, so ticking one clears the other. \"Class unreadable\" is used when the game hides a stranger's class.")
+			help:SetText("Tick the buffs for each class (open the list to see names). Dampen and Amplify Magic replace each other, so ticking one clears the other.")
 		else
-			help:SetText("Pick the blessing for each class (open the list to see names). \"Class unreadable\" is used when the game hides a stranger's class.")
+			help:SetText("Pick the blessing for each class (open the list to see names).")
 		end
 	end
 
@@ -301,6 +340,16 @@ function WM:CreateOptions()
 	Settings.RegisterAddOnCategory(category)
 	WM.optionsCategory = category
 	WM.optionsPanel = panel
+end
+
+-- Open Blizzard's Key Bindings screen with its search box filled in so only WellMet's binding is listed. The
+-- search matches single words against binding NAMES (not section headers), and ours contains "WellMet"
+-- (Core/Cast.lua), which nothing else does. The box is filled a moment after the screen opens, because
+-- opening clears it.
+local STEP = 0.1
+function WM:OpenKeyBindings()
+	Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID)
+	C_Timer.After(STEP, function() SettingsPanel.SearchBox:SetText(BINDING_HEADER_WELLMET) end)
 end
 
 function WM:OpenOptions()

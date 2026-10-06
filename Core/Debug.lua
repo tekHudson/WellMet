@@ -58,8 +58,8 @@ function WM:BuildReport()
 		local version, build, _, toc = GetBuildInfo()
 		add(string.format("addon %s | client %s (%s) interface %s", S(WM.version), S(version), S(build), S(toc)))
 		add(string.format("player=%s class=%s", S(WM.player), S(WM.classToken)))
-		add(string.format("radius=%s  strangers=%s  groupFirst=%s  includeSelf=%s  allowMounted=%s  unknownClass=%s",
-			S(db.radius), yn(db.strangers), yn(db.groupFirst), yn(db.includeSelf), yn(db.allowMounted), S(db.unknownClass)))
+		add(string.format("radius=%s  strangers=%s  groupFirst=%s  includeSelf=%s  allowMounted=%s",
+			S(db.radius), yn(db.strangers), yn(db.groupFirst), yn(db.includeSelf), yn(db.allowMounted)))
 		add("debug=" .. yn(db.debug))
 		add(string.format("inCombat=%s  mounted=%s  flying=%s  taxi=%s", yn(InCombatLockdown()), yn(IsMounted()), yn(IsFlying()), yn(UnitOnTaxi("player"))))
 	end)
@@ -73,9 +73,9 @@ function WM:BuildReport()
 		add(string.format("failure strings: LOS=%s range=%s ERR_OUT_OF_RANGE=%s vision=%s bounced=%s",
 			yn(_G.SPELL_FAILED_LINE_OF_SIGHT), yn(_G.SPELL_FAILED_OUT_OF_RANGE), yn(_G.ERR_OUT_OF_RANGE),
 			yn(_G.SPELL_FAILED_VISION_OBSCURED), yn(_G.SPELL_FAILED_AURA_BOUNCED)))
-		for _, key in ipairs(WM.caster.order) do
+		for _, key in ipairs(WM.caster.all) do
 			local buff = WM.caster.buffs[key]
-			add(string.format("buff %-9s %-22s id=%s known=%s", key, buff.name, S(ns.SpellId(buff)), yn(ns.IsKnown(buff))))
+			add(string.format("buff %-14s %-24s id=%s known=%s", key, buff.name, S(ns.SpellId(buff)), yn(ns.IsKnown(buff))))
 		end
 	end)
 

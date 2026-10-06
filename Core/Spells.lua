@@ -40,7 +40,7 @@ end
 
 -- Re-resolve ids for the caster's buffs (login, and when spells change).
 function WM:InitSpells()
-	for _, key in ipairs(WM.caster.order) do
+	for _, key in ipairs(WM.caster.all) do
 		local buff = WM.caster.buffs[key]
 		buff.id = ns.SpellId(buff)
 		buff.known = buff.id ~= nil and C_SpellBook.IsSpellKnown(buff.id) and true or false

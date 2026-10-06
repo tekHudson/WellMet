@@ -92,7 +92,8 @@ function WM:OnPress(b, fromMacro)
 	WM.lastPick = { best = best, skipped = skipped, rejected = rejected, info = info, at = now, cands = cands }
 
 	if not best then
-		local msg = "Nobody nearby needs " .. names(WM.caster) .. "."
+		local list = names(WM.caster)
+		local msg = (list ~= "") and ("Nobody nearby needs " .. list .. ".") or "Nothing needs buffing right now."
 		if not ns.AurasReadable() then
 			msg = "Buff info is restricted right now (combat or an encounter), so WellMet can't tell who needs a buff."
 		elseif WM.db.strangers and ns.Discovery.NameplatesOn() == false then
@@ -244,7 +245,9 @@ end)
 -- Key Bindings window (under "WellMet"). These globals must exist when that window builds.
 ----------------------------------------------------------------------
 _G.BINDING_HEADER_WELLMET = "WellMet"
-_G["BINDING_NAME_" .. CLICK_ACTION] = "Buff the next nearby player"
+-- "(WellMet)" is in the name on purpose: the Key Bindings search matches words in binding names only, so
+-- searching "WellMet" finds exactly this binding (see WM:OpenKeyBindings).
+_G["BINDING_NAME_" .. CLICK_ACTION] = "Buff the next nearby player (WellMet)"
 ns.CLICK_ACTION = CLICK_ACTION
 
 ----------------------------------------------------------------------

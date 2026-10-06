@@ -10,10 +10,10 @@ local DEFAULTS = {
 	groupFirst   = true,       -- group members before strangers
 	includeSelf  = true,       -- buff yourself too (first)
 	allowMounted = false,      -- refuse to cast while mounted (casting would dismount you)
-	unknownClass = "WISDOM",   -- blessing for targets whose class can't be read
 	minimap      = { hide = false, angle = 200 },   -- minimap button: hidden?, position around the minimap (degrees)
 	debug        = false,      -- record the /wellmet log and show press-time chat messages
 	assign       = {},         -- Paladin: target class -> buff key ("NONE" skips); falls back to ns.DefaultAssign
+	selfChoice   = {},         -- own-buff category key -> buff key | "AUTO" | "NONE"; falls back to the category's default
 	stack        = {},         -- Mage: buff key -> { target class -> true/false }; falls back to the buff's defaultClasses
 }
 
@@ -36,29 +36,26 @@ function WM:InitDB()
 	WM.db = WellMetDB.profile
 end
 
--- Is a "stack" buff (Mage) switched on for this target class? class nil = unreadable (stored as "UNKNOWN").
+-- Is a "stack" buff (Mage) switched on for this target class?
 function ns.StackEnabled(buff, class, stack)
 	local saved = stack and stack[buff.key]
-	local c = class or "UNKNOWN"
-	if saved and saved[c] ~= nil then return saved[c] end
-	return buff.defaultClasses and buff.defaultClasses[c] or false
+	if saved and saved[class] ~= nil then return saved[class] end
+	return buff.defaultClasses and buff.defaultClasses[class] or false
 end
 
 -- Switch a stack buff on/off for a class; switching one on switches off the buff it replaces.
 function ns.StackSet(caster, buff, class, on)
 	local stack = WM.db.stack
-	local c = class or "UNKNOWN"
 	stack[buff.key] = stack[buff.key] or {}
-	stack[buff.key][c] = on and true or false
+	stack[buff.key][class] = on and true or false
 	if on and buff.exclusive then
 		local other = caster.buffs[buff.exclusive]
 		stack[other.key] = stack[other.key] or {}
-		stack[other.key][c] = false
+		stack[other.key][class] = false
 	end
 end
 
--- The buff key assigned to a target class (nil class = unreadable class).
+-- The buff key assigned to a target class.
 function ns.AssignedKey(class)
-	if not class then return WM.db.unknownClass end
 	return WM.db.assign[class] or ns.DefaultAssign[class]
 end

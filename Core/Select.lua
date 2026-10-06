@@ -52,6 +52,8 @@ end
 --   assign mode (Paladin): exactly one, chosen per target class.
 --   stack mode  (Mage):    every buff switched on for the target class.
 function Select.BuffsFor(caster, class, settings)
+	if caster.mode == "self" then return nil, "this class only buffs itself" end
+	if not class then return nil, "class not readable, so no buff is chosen" end
 	if caster.mode == "stack" then
 		local list = {}
 		for _, key in ipairs(caster.order) do
@@ -61,16 +63,25 @@ function Select.BuffsFor(caster, class, settings)
 		if #list == 0 then return nil, "no buffs are switched on for this class" end
 		return list
 	end
-	local key
-	if class then
-		key = settings.assign[class] or ns.DefaultAssign[class]
-	else
-		key = settings.unknownClass
-	end
+	local key = settings.assign[class] or ns.DefaultAssign[class]
 	if key == nil or key == "NONE" then return nil, "assignment: skip this class" end
 	local buff = caster.buffs[key]
 	if not buff then return nil, "no buff '" .. ns.SafeStr(key) .. "' for this caster" end
 	return { buff }
+end
+
+-- The caster's own buff for one category (an aura, an armor), or nil (+ a reason when it can't be chosen).
+--   choice "NONE": nothing. "AUTO": the first spell in category.auto that is learned.
+function Select.SelfBuff(caster, cat, settings, isKnown)
+	local choice = (settings.selfChoice and settings.selfChoice[cat.key]) or cat.default
+	if choice == nil or choice == "NONE" then return nil end
+	if choice == "AUTO" then
+		for _, key in ipairs(cat.auto) do
+			if isKnown(caster.buffs[key]) then return caster.buffs[key] end
+		end
+		return nil, "none of the " .. cat.title:lower() .. " spells is learned"
+	end
+	return caster.buffs[choice]
 end
 
 local function tierOf(entry, settings)
@@ -123,7 +134,18 @@ function Select.Pick(cands, ctx)
 		return nil, dist
 	end
 
-	for _, cand in ipairs(cands) do
+	local function add(cand, buff)
+		local reason, dist = whyNot(cand, buff)
+		if reason then
+			skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
+		else
+			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge }
+		end
+	end
+
+	local selfOnly = ctx.caster.mode == "self"        -- this class only buffs itself: other people aren't considered
+	local function consider(cand)
+		if selfOnly and cand.tier ~= 0 then return end
 		local gate
 		if cand.tier == 0 and not settings.includeSelf then
 			gate = "buffing yourself is turned off"
@@ -132,22 +154,29 @@ function Select.Pick(cands, ctx)
 		end
 		if gate then
 			skipped[#skipped + 1] = { cand = cand, reason = gate }
-		else
-			local buffs, why = Select.BuffsFor(ctx.caster, cand.class, settings)
-			if not buffs then
-				skipped[#skipped + 1] = { cand = cand, reason = why }
-			else
-				for _, buff in ipairs(buffs) do
-					local reason, dist = whyNot(cand, buff)
-					if reason then
-						skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
-					else
-						eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge }
-					end
+			return
+		end
+		if cand.tier == 0 then
+			-- your own buffs first (armor, aura, ...); they sort ahead of everything else
+			for _, cat in ipairs(ctx.caster.selfCategories) do
+				local buff, why = Select.SelfBuff(ctx.caster, cat, settings, known)
+				if buff then
+					add(cand, buff)
+				elseif why then
+					skipped[#skipped + 1] = { cand = cand, reason = why }
 				end
 			end
 		end
+		if selfOnly then return end
+		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, settings)
+		if not buffs then
+			skipped[#skipped + 1] = { cand = cand, reason = why }
+			return
+		end
+		for _, buff in ipairs(buffs) do add(cand, buff) end
 	end
+
+	for _, cand in ipairs(cands) do consider(cand) end
 
 	table.sort(eligible, before(settings))
 	return eligible[1], skipped, eligible

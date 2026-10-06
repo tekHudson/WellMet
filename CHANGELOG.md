@@ -10,12 +10,17 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   Blessing of Might or Blessing of Wisdom; press again for the next person.
 - Mage: Arcane Intellect (Arcane Brilliance counts as having it) on mana classes by default, plus optional
   Dampen Magic / Amplify Magic (they replace each other); a checkbox dropdown per target class in settings.
+- Your own buffs on the same key, cast on you before anyone else: Paladin aura (Devotion by default) and optional
+  Righteous Fury, Mage armor (Frost/Ice "best learned", or Mage Armor), Warlock armor (Demon Skin/Armor). Warlock
+  is supported with these alone. Spell names checked against the Forever spellbook (no Sanctity Aura, no Fel Armor).
+- Priest (Inner Fire), Shaman (Lightning / Water Shield), Hunter (an Aspect: Hawk/Monkey "best learned" or a chosen one)
+  and Warrior (Battle Shout) keep up their own buffs. Spell names checked against the Forever spellbook.
 - Classes with no buffs get no WellMet at all (nothing is created or printed).
 - Settings show a buff you haven't learned greyed out, with its own icon and an "Unknown" tooltip.
 - Candidates: you, your group, your target, and friendly-player nameplates (strangers).
   Order: you, then group, then everyone else; nearest first; arrival order breaks ties.
 - Settings: key, search radius (cast range / 28 yd / 10 yd), include strangers, group first, buff myself,
-  mounted behavior, and which blessing goes on which target class (plus a default for unreadable classes).
+  mounted behavior, and which blessing goes on which target class (a person whose class can't be read is skipped).
 - Remembers who it just tried (so the next press moves on), skips people it couldn't reach
   (out of range / line of sight) and people who already have a stronger buff.
 - Slash commands `/wellmet`, `/well` and `/wmet` (not `/wm`: that is Blizzard's world-marker command).
