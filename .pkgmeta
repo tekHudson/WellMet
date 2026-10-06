@@ -1,0 +1,13 @@
+package-as: WellMet
+
+enable-nolib-creation: no
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown
+
+ignore:
+  - tests
+  - .github
+  - .gitignore
+  - README.md

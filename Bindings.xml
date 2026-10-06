@@ -1,0 +1,7 @@
+<Bindings>
+	<!-- Shows up in the game's Key Bindings window under "WellMet" (the header text is
+	     BINDING_HEADER_WELLMET, set in Core/Cast.lua). The same secure button is also
+	     usable from a macro: /click WellMetCast -->
+	<Binding name="CLICK WellMetCast:LeftButton" category="BINDING_HEADER_WELLMET">
+	</Binding>
+</Bindings>

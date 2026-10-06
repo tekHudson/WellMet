@@ -1,0 +1,22 @@
+## Interface: 16001
+## Title: WellMet
+## Notes: One key buffs the next nearby player who needs it. Built for WoW Forever.
+## Author: tek
+## Version: 0.1.0
+## DefaultState: enabled
+## IconTexture: Interface\AddOns\WellMet\Icons\Icon
+## SavedVariables: WellMetDB
+
+# WoW Forever only. The client picks this file by its game-type suffix (_Camelot);
+# there is deliberately no unsuffixed WellMet.toc. Bindings.xml loads automatically.
+
+WellMet.lua
+Data\Classes.lua
+Core\DB.lua
+Core\Spells.lua
+Core\Discovery.lua
+Core\Select.lua
+Core\Cast.lua
+Core\Debug.lua
+UI\Options.lua
+UI\Minimap.lua
