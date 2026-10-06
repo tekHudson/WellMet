@@ -23,7 +23,7 @@ local function newWorld()
 		now = 1000, combat = false, mounted = false, flying = false, taxi = false,
 		restricted = false, raid = false, groupSize = 0,
 		cvars = { nameplateShowFriendlyPlayers = "1" },
-		units = {}, plates = {}, known = {}, spells = {},
+		units = {}, plates = {}, known = {}, spells = {}, macros = {}, sent = {},
 		bindings = {},           -- key -> action (pre-existing bindings)
 		overrides = {},          -- key -> action set by addon
 		prints = {}, sentCalls = 0,
@@ -78,6 +78,15 @@ local function newEnv(W)
 	g.IsFlying = function() return W.flying end
 	g.UnitOnTaxi = function() return W.taxi end
 	g.IsInRaid = function() return W.raid end
+	g.IsInGroup = function() return W.groupSize > 0 end
+	g.IsInInstance = function() return W.inInstance or false, W.inInstance and "party" or "none" end
+	g.C_ChatInfo = {
+		InChatMessagingLockdown = function() return W.lockdown or false end,
+		SendChatMessage = function(msg, chatType)
+			if W.sendError then error(W.sendError) end
+			W.sent[#W.sent + 1] = { msg = msg, chatType = chatType }
+		end,
+	}
 	g.GetNumGroupMembers = function() return W.groupSize end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
@@ -109,8 +118,14 @@ local function newEnv(W)
 		function f:SetupMenu(fn) self.menuGen = fn end
 		function f:SetSelectionTranslator(fn) self.selTranslator = fn end
 		function f:SetSelectionText(fn) self.selText = fn end
-		function f:RegisterEvent(e) self.events = self.events or {}; self.events[e] = true end
-		function f:RegisterUnitEvent(e) self.events = self.events or {}; self.events[e] = true end
+		local function events(self) local ev = rawget(self, "events"); if not ev then ev = {}; rawset(self, "events", ev) end; return ev end
+		function f:RegisterEvent(e) events(self)[e] = true end
+		function f:UnregisterEvent(e) events(self)[e] = nil end
+		function f:HookScript(k, fn)
+			local old = self.scripts[k]
+			self.scripts[k] = function(...) if old then old(...) end fn(...) end
+		end
+		function f:RegisterUnitEvent(e) events(self)[e] = true end
 		E.frames[#E.frames + 1] = f
 		if name then g[name] = f end
 		return setmetatable(f, { __index = function() return proxy() end })
@@ -161,6 +176,16 @@ local function newEnv(W)
 
 	-- bindings
 	g.Minimap = { GetWidth = function() return 198 end, GetCenter = function() return 0, 0 end, GetEffectiveScale = function() return 1 end }
+	g.Constants = { MacroConsts = { MAX_ACCOUNT_MACROS = 3, MAX_CHARACTER_MACROS = 2 } }       -- small limits so "full" is easy to test
+	g.GetMacroInfo = function(i) local m = W.macros[i]; if m then return m.name, m.icon, m.body end end
+	g.GetNumMacros = function() local a, c = 0, 0 for i, m in pairs(W.macros) do if i <= 3 then a = a + 1 else c = c + 1 end end return a, c end
+	g.CreateMacro = function(name, icon, body, forCharacter)
+		local first, last = forCharacter and 4 or 1, forCharacter and 5 or 3
+		for i = first, last do
+			if not W.macros[i] then W.macros[i] = { name = name, icon = icon, body = body }; return i end
+		end
+	end
+	g.PickupMacro = function(i) W.cursorMacro = i end
 	g.C_Timer = { After = function(_, fn) fn() end }        -- run at once; the real delay doesn't matter here
 	g.GetBindingAction = function(key) return W.overrides[key] or W.bindings[key] or "" end
 	g.GetBindingKey = function(action) for key, a in pairs(W.bindings) do if a == action then return key end end end
@@ -170,6 +195,12 @@ local function newEnv(W)
 	-- settings
 	g.Settings = {
 		RegisterCanvasLayoutCategory = function() return { GetID = function() return 1 end } end,
+		RegisterCanvasLayoutSubcategory = function(_, panel, name)
+			W.subcategories = W.subcategories or {}
+			local id = 100 + #W.subcategories + 1
+			W.subcategories[#W.subcategories + 1] = { id = id, name = name, panel = panel }
+			return { GetID = function() return id end }
+		end,
 		RegisterAddOnCategory = function() end,
 		OpenToCategory = function(id, section) W.openedCategory = id; W.openedSection = section end,
 	}
@@ -196,6 +227,7 @@ local function load(opts)
 	local WM = ns.WM
 	if not ns.supported then return nil, ns, E, W end
 	WM:ADDON_LOADED("ADDON_LOADED", "WellMet")
+	if opts.others ~= false then WM.db.others.enabled = true end          -- a fresh profile has Others off; most checks need strangers
 	if opts.login ~= false then WM:PLAYER_LOGIN() end
 	if WM.db and opts.debug ~= false then WM.db.debug = true end     -- most checks read press messages / the log
 	return WM, ns, E, W
@@ -205,6 +237,16 @@ local function press(E)
 	local b = E.g.WellMetCast
 	b.scripts.PreClick(b, "LeftButton", true)
 	return b
+end
+
+-- A settings table in the three-section shape for Select.Pick. `over` may carry the old flat names for brevity:
+-- radius, assign, stack, selfChoice (copied into the sections) and includeSelf / strangers (the on/off switches).
+local function mkSettings(over)
+	over = over or {}
+	local function section(enabled)
+		return { enabled = enabled, radius = over.radius or 0, assign = over.assign or {}, stack = over.stack or {}, choice = over.selfChoice or {} }
+	end
+	return { self = section(over.includeSelf ~= false), party = section(true), others = section(over.strangers ~= false) }
 end
 
 local function printed(W, needle)
@@ -272,19 +314,13 @@ do
 			distance = function(c) return opts.dist and opts.dist[c.key] or nil end,
 		}
 	end
-	local function settings(over)
-		local s = { assign = {}, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
-		for k, v in pairs(over or {}) do s[k] = v end
-		return s
-	end
+	local function settings(over) return mkSettings(over) end
 	local function ctx(p, s) return { now = 100, settings = s or settings(), caster = WM.caster, probe = p or probe() } end
 
 	local best = Select.Pick({ cand("stranger", 2, "MAGE", 1), cand("grp", 1, "MAGE", 1), cand("me", 0, "PALADIN", 0) }, ctx())
 	check("tier order: you, then group, then strangers", best.cand.key == "me")
 	best = Select.Pick({ cand("stranger", 2, "MAGE", 1), cand("grp", 1, "MAGE", 1) }, ctx())
 	check("group before strangers", best.cand.key == "grp")
-	best = Select.Pick({ cand("stranger", 2, "MAGE", 1), cand("grp", 1, "MAGE", 1) }, ctx(nil, settings({ groupFirst = false })))
-	check("group-first off: strangers rank equal to group (by distance/order)", best.cand.key == "stranger" or best.cand.key == "grp")
 	best = Select.Pick({ cand("far", 2, "MAGE", 1), cand("near", 2, "MAGE", 2) }, ctx(probe({ dist = { far = 28, near = 10 } })))
 	check("nearest first within a tier", best.cand.key == "near")
 	best = Select.Pick({ cand("unknownDist", 2, "MAGE", 1), cand("known", 2, "MAGE", 2) }, ctx(probe({ dist = { known = 28 } })))
@@ -305,9 +341,9 @@ do
 	_, skipped = Select.Pick({ cand("x", 2, "MAGE") }, ctx(probe({ known = { WISDOM = false, MIGHT = false } })))
 	check("skips when the spell isn't learned", skipped[1] and skipped[1].reason:find("not learned", 1, true) ~= nil)
 	_, skipped = Select.Pick({ cand("me", 0, "PALADIN") }, ctx(nil, settings({ includeSelf = false })))
-	check("self can be turned off", skipped[1] and skipped[1].reason:find("yourself", 1, true) ~= nil)
+	check("the Self section can be turned off", skipped[1] and skipped[1].reason:find("Self section is switched off", 1, true) ~= nil)
 	_, skipped = Select.Pick({ cand("s", 2, "MAGE") }, ctx(nil, settings({ strangers = false })))
-	check("strangers can be turned off", skipped[1] and skipped[1].reason:find("outside the group", 1, true) ~= nil)
+	check("the Others section can be turned off", skipped[1] and skipped[1].reason:find("Others section is switched off", 1, true) ~= nil)
 
 	-- radius
 	local pk = probe({ dist = { near = 10, mid = 28 } })
@@ -389,13 +425,13 @@ do
 		and #rejected == 2 and rejected[1].reason:find("full name", 1, true) ~= nil)
 
 	-- strangers off: nameplates ignored
-	WM.db.strangers = false
+	WM.db.others.enabled = false
 	W.plates = { "nameplate1" }
 	list = D.Discover()
 	local sawStranger
 	for _, c in ipairs(list) do if c.name == "Stranger" then sawStranger = true end end
 	check("nameplates are ignored when strangers are turned off", not sawStranger)
-	WM.db.strangers = true
+	WM.db.others.enabled = true
 
 	-- target as a stranger
 	W.plates = {}
@@ -607,7 +643,7 @@ do
 	local function cand(key, class, order) return { unit = key, key = key, name = key, tier = 2, class = class, order = order or 1 } end
 	local probe = { known = function() return true end, inRange = function() return true end, lacks = function() return true end, distance = function() return nil end }
 	local function ctx(settings) return { now = 100, settings = settings, caster = WM.caster, probe = probe } end
-	local s = { assign = {}, stack = {}, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }
+	local s = mkSettings()
 
 	local best, skipped, eligible = Select.Pick({ cand("w", "WARRIOR"), cand("p", "PRIEST") }, ctx(s))
 	check("Intellect goes on a mana class by default, not on a Warrior",
@@ -618,20 +654,20 @@ do
 	check("Rogue gets nothing by default", best == nil)
 
 	-- stacking
-	ns.StackSet(WM.caster, B.DAMPEN, "PRIEST", true)
-	local _, _, el = Select.Pick({ cand("p", "PRIEST") }, ctx({ assign = {}, stack = WM.db.stack, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }))
+	ns.StackSet(WM.caster, B.DAMPEN, "PRIEST", true, WM.db.party.stack)
+	local _, _, el = Select.Pick({ cand("p", "PRIEST") }, ctx(mkSettings({ stack = WM.db.party.stack })))
 	check("with Dampen on, one person yields Intellect then Dampen", #el == 2 and el[1].buff.key == "INTELLECT" and el[2].buff.key == "DAMPEN")
 	Select.Mark("p", "Arcane Intellect", 8, 100)
-	best = Select.Pick({ cand("p", "PRIEST"), cand("q", "PRIEST", 2) }, ctx({ assign = {}, stack = WM.db.stack, strangers = true, groupFirst = true, includeSelf = true, radius = 0 }))
+	best = Select.Pick({ cand("p", "PRIEST"), cand("q", "PRIEST", 2) }, ctx(mkSettings({ stack = WM.db.party.stack })))
 	check("after Intellect was just cast, the next press does Dampen on the same person", best.cand.key == "p" and best.buff.key == "DAMPEN")
 	Select.Reset()
 
 	-- Dampen / Amplify replace each other
-	ns.StackSet(WM.caster, B.AMPLIFY, "PRIEST", true)
+	ns.StackSet(WM.caster, B.AMPLIFY, "PRIEST", true, WM.db.party.stack)
 	check("switching Amplify on switches Dampen off for that class",
-		ns.StackEnabled(B.AMPLIFY, "PRIEST", WM.db.stack) and not ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
-	check("...and leaves other classes alone", not ns.StackEnabled(B.AMPLIFY, "MAGE", WM.db.stack) and ns.StackEnabled(B.INTELLECT, "MAGE", WM.db.stack))
-	WM.db.stack = {}
+		ns.StackEnabled(B.AMPLIFY, "PRIEST", WM.db.party.stack) and not ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.party.stack))
+	check("...and leaves other classes alone", not ns.StackEnabled(B.AMPLIFY, "MAGE", WM.db.party.stack) and ns.StackEnabled(B.INTELLECT, "MAGE", WM.db.party.stack))
+	WM.db.party.stack = {}
 
 	-- Arcane Brilliance counts as having Intellect
 	addUnit(W, "party1", { class = "PRIEST", name = "Pria", guid = "G-pria", auras = { ["Arcane Brilliance"] = true } })
@@ -653,11 +689,15 @@ do
 		printed(W, "Nobody nearby needs Arcane Intellect.") and not printed(W, "Dampen"))
 	W.units.player.auras = {}
 
-	-- settings: one multi-select dropdown per class (10 = radius + 9 classes)
-	local dds = {}
-	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
-	local nSelf = #WM.caster.selfCategories      -- the "Yourself" dropdown(s) sit between the radius and the class rows
-	check("Mage settings have the self dropdown + radius + 9 classes", nSelf == 1 and #dds == nSelf + 10)
+	-- settings: Party / Raid and Others each have a multi-select dropdown per class (found by name)
+	local function dd(name) return E.g[name] end
+	local classes = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
+	local complete = true
+	for _, section in ipairs({ "Party", "Others" }) do
+		for _, class in ipairs(classes) do if not dd("WellMet" .. section .. "Class" .. class) then complete = false end end
+	end
+	check("Mage settings: a dropdown per class in both Party / Raid and Others, plus the Self ones",
+		complete and dd("WellMetPartyRadius") and dd("WellMetOthersRadius") and dd("WellMetSelfCatARMOR") and dd("WellMetSelfOwn"))
 	local function checklist(dd)
 		local items = {}
 		dd.menuGen(dd, { CreateCheckbox = function(_, label, isSelected, toggle, data)
@@ -667,20 +707,20 @@ do
 		end })
 		return items
 	end
-	local priest = checklist(dds[nSelf + 6])      -- Druid, Hunter, Mage, Paladin, Priest -> 6th dropdown (1st is the radius)
+	local priest = checklist(dd("WellMetPartyClassPRIEST"))      -- Druid, Hunter, Mage, Paladin, Priest -> 6th dropdown (1st is the radius)
 	check("a class dropdown lists the three buffs with icons; Intellect is ticked by default",
 		#priest == 3 and priest[1].label:find("|T1001459:", 1, true) and priest[1].label:find("Arcane Intellect", 1, true) and priest[1].on and not priest[2].on and not priest[3].on)
 	priest[2].toggle()
-	check("ticking Dampen Magic saves it", checklist(dds[nSelf + 6])[2].on and ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.stack))
-	checklist(dds[nSelf + 6])[3].toggle()
-	check("ticking Amplify Magic unticks Dampen Magic", checklist(dds[nSelf + 6])[3].on and not checklist(dds[nSelf + 6])[2].on)
+	check("ticking Dampen Magic saves it", checklist(dd("WellMetPartyClassPRIEST"))[2].on and ns.StackEnabled(B.DAMPEN, "PRIEST", WM.db.party.stack))
+	checklist(dd("WellMetPartyClassPRIEST"))[3].toggle()
+	check("ticking Amplify Magic unticks Dampen Magic", checklist(dd("WellMetPartyClassPRIEST"))[3].on and not checklist(dd("WellMetPartyClassPRIEST"))[2].on)
 	check("the closed dropdown shows the icons of what is ticked",
-		dds[nSelf + 6].selText({ { data = "INTELLECT" }, { data = "AMPLIFY" } }) == "|T1001459:20|t|T1001008:20|t" and dds[nSelf + 6].selText({}):find("none", 1, true) ~= nil)
-	WM.db.stack = {}
+		dd("WellMetPartyClassPRIEST").selText({ { data = "INTELLECT" }, { data = "AMPLIFY" } }) == "|T1001459:20|t|T1001008:20|t" and dd("WellMetPartyClassPRIEST").selText({}):find("none", 1, true) ~= nil)
+	WM.db.party.stack = {}
 
 	-- a spell the player hasn't learned: its own icon (from the data), greyed, with an "Unknown" tooltip
 	W.known[1008] = nil; W.spells["Amplify Magic"] = nil
-	local unk = checklist(dds[nSelf + 6])
+	local unk = checklist(dd("WellMetPartyClassPRIEST"))
 	check("an unlearned buff keeps its real icon (from the data file), not a question mark",
 		unk[3].label:find("Spell_Holy_FlashHeal", 1, true) ~= nil and not unk[3].label:find("134400", 1, true))
 	check("...with the icon dimmed and the name greyed", unk[3].label:find(":110:110:110|t", 1, true) ~= nil and unk[3].label:find("|cff808080Amplify Magic|r", 1, true) ~= nil)
@@ -691,7 +731,7 @@ do
 	check("only the unlearned buff has a tooltip, and it says Unknown", unk[3].tooltip ~= nil and unk[1].tooltip == nil and unk[2].tooltip == nil)
 	unk[3].tooltip({})
 	check("the tooltip title is 'Unknown'", lines[1] == "Unknown")
-	check("the closed dropdown dims an unlearned buff's icon too", dds[nSelf + 6].selText({ { data = "AMPLIFY" } }):find("110:110:110", 1, true) ~= nil)
+	check("the closed dropdown dims an unlearned buff's icon too", dd("WellMetPartyClassPRIEST").selText({ { data = "AMPLIFY" } }):find("110:110:110", 1, true) ~= nil)
 end
 
 ----------------------------------------------------------------------
@@ -711,27 +751,27 @@ do
 	W.now = W.now + 100; ns.Select.Reset()
 	b = press(E)
 	check("...once you have it, the next press is the blessing on yourself", b.attrs.spell == "Blessing of Wisdom" and b.attrs.unit == "player")
-	WM.db.selfChoice.AURA = "RETRIBUTION"
+	WM.db.self.choice.AURA = "RETRIBUTION"
 	W.now = W.now + 100; ns.Select.Reset()
 	b = press(E)
 	check("a different aura choice is used", b.attrs.spell == "Retribution Aura")
-	WM.db.selfChoice.AURA = "NONE"
+	WM.db.self.choice.AURA = "NONE"
 	W.now = W.now + 100; ns.Select.Reset()
 	b = press(E)
 	check("aura set to None: skipped", b.attrs.spell == "Blessing of Wisdom")
-	WM.db.selfChoice.AURA = nil
+	WM.db.self.choice.AURA = nil
 	W.units.player.auras = { ["Devotion Aura"] = true }
 	W.now = W.now + 100; ns.Select.Reset()
 	check("Righteous Fury is off by default", press(E).attrs.spell == "Blessing of Wisdom")
-	WM.db.selfChoice.FURY = "RIGHTEOUS_FURY"
+	WM.db.self.choice.FURY = "RIGHTEOUS_FURY"
 	W.now = W.now + 100; ns.Select.Reset()
 	check("...and cast after the aura once it is chosen", press(E).attrs.spell == "Righteous Fury")
-	WM.db.selfChoice.FURY = nil
-	WM.db.includeSelf = false
+	WM.db.self.choice.FURY = nil
+	WM.db.self.enabled = false
 	W.now = W.now + 100; ns.Select.Reset()
 	W.units.player.auras = {}
 	check("'Buff myself' off also turns off the self buffs", press(E).attrs.type == nil)
-	WM.db.includeSelf = true
+	WM.db.self.enabled = true
 	W.now = W.now + 100; ns.Select.Reset()
 	W.known[465] = nil
 	local best, skipped = ns.Select.Pick({ { unit = "player", key = "me", name = "Tek", tier = 0, class = "PALADIN", order = 0 } },
@@ -747,10 +787,10 @@ do
 	learn(Wm, { ["Ice Armor"] = 7302 })
 	Wm.now = Wm.now + 100; nsm.Select.Reset()
 	check("...and Ice Armor once it is learned", press(Em).attrs.spell == "Ice Armor")
-	WMm.db.selfChoice.ARMOR = "MAGE_ARMOR"
+	WMm.db.self.choice.ARMOR = "MAGE_ARMOR"
 	Wm.now = Wm.now + 100; nsm.Select.Reset()
 	check("a specific choice (Mage Armor) overrides 'best learned'", press(Em).attrs.spell == "Mage Armor")
-	WMm.db.selfChoice.ARMOR = nil
+	WMm.db.self.choice.ARMOR = nil
 	-- armor AND Intellect both learned and both missing: the armor must come first, then Intellect
 	learn(Wm, { ["Arcane Intellect"] = 1459 })
 	Wm.units.player.auras = {}
@@ -764,31 +804,43 @@ do
 	Wm.now = Wm.now + 100; nsm.Select.Reset()
 	check("with the armor on, the Mage moves on to Arcane Intellect or nothing (armor is not repeated)", press(Em).attrs.spell ~= "Ice Armor")
 
-	-- Warlock: only buffs itself; becomes a supported class
-	local WMw, nsw, Ew, Ww = load({ class = "WARLOCK", login = false })
-	learn(Ww, { ["Demon Skin"] = 687 })
+	-- Priest: Inner Fire on yourself, then Fortitude and Divine Spirit (Shadow Protection is off by default)
+	local WMw, nsw, Ew, Ww = load({ class = "PRIEST", login = false })
+	learn(Ww, { ["Inner Fire"] = 588, ["Power Word: Fortitude"] = 1243, ["Divine Spirit"] = 14752, ["Shadow Protection"] = 976 })
 	WMw:PLAYER_LOGIN(); WMw.db.debug = true
-	check("Warlock is supported and only buffs itself", nsw.supported == true and WMw.caster.mode == "self" and #WMw.caster.order == 0)
-	addUnit(Ww, "nameplate1", { class = "PRIEST", name = "Stranger", guid = "G-s", interact = "mid", auras = {} })
-	Ww.plates = { "nameplate1" }
-	local bw = press(Ew)
-	check("Warlock: casts the best learned armor on itself, ignoring other players",
-		bw.attrs.type == "spell" and bw.attrs.spell == "Demon Skin" and bw.attrs.unit == "player")
-	Ww.units.player.auras = { ["Demon Skin"] = true }
-	Ww.now = Ww.now + 100; nsw.Select.Reset()
-	Ww.prints = {}
-	check("Warlock with the armor on: nothing happens and says so", press(Ew).attrs.type == nil and printed(Ww, "Nothing needs buffing"))
-	local _, skipW = nsw.Select.Pick({ { unit = "nameplate1", key = "s", name = "S", tier = 2, class = "PRIEST", order = 1 } },
+	Ww.groupSize = 0
+	local P = WMw.caster.buffs
+	check("Priest is supported, in stack mode: Fortitude / Divine Spirit / Shadow Protection on others, Inner Fire on itself",
+		nsw.supported == true and WMw.caster.mode == "stack" and #WMw.caster.order == 3 and P.FORTITUDE.name == "Power Word: Fortitude"
+		and P.SPIRIT.name == "Divine Spirit" and P.SHADOW_PROT.name == "Shadow Protection" and P.INNER_FIRE.selfOnly == true)
+	check("Priest defaults: Fortitude for every class, Divine Spirit for mana classes only, Shadow Protection for none",
+		nsw.StackEnabled(P.FORTITUDE, "WARRIOR", WMw.db.party.stack) and nsw.StackEnabled(P.FORTITUDE, "ROGUE", WMw.db.party.stack)
+		and nsw.StackEnabled(P.SPIRIT, "MAGE", WMw.db.party.stack) and nsw.StackEnabled(P.SPIRIT, "PRIEST", WMw.db.party.stack)
+		and not nsw.StackEnabled(P.SPIRIT, "WARRIOR", WMw.db.party.stack) and not nsw.StackEnabled(P.SPIRIT, "ROGUE", WMw.db.party.stack)
+		and not nsw.StackEnabled(P.SHADOW_PROT, "MAGE", WMw.db.party.stack))
+	local _, _, pOrder = nsw.Select.Pick({ { unit = "player", key = "me", name = "Tek", tier = 0, class = "PRIEST", order = 0 } },
 		{ now = 100, settings = WMw.db, caster = WMw.caster, probe = nsw.Probe })
-	check("...and other players are not even listed as skipped", #skipW == 0)
-	learn(Ww, { ["Demon Armor"] = 706 })
+	local seq = {}
+	for _, e in ipairs(pOrder) do seq[#seq + 1] = e.buff.key end
+	check("Priest on yourself: Inner Fire first, then Fortitude, then Divine Spirit", table.concat(seq, ",") == "INNER_FIRE,FORTITUDE,SPIRIT")
+	check("Priest: the first press casts Inner Fire", press(Ew).attrs.spell == "Inner Fire")
+	Ww.units.player.auras = { ["Inner Fire"] = true }
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	check("...then Power Word: Fortitude", press(Ew).attrs.spell == "Power Word: Fortitude")
+	Ww.units.player.auras = { ["Inner Fire"] = true, ["Prayer of Fortitude"] = true }
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	check("...Prayer of Fortitude (the group version) counts as having Fortitude, so Divine Spirit is next", press(Ew).attrs.spell == "Divine Spirit")
+	Ww.units.player.auras = { ["Inner Fire"] = true, ["Prayer of Fortitude"] = true, ["Prayer of Spirit"] = true }
+	Ww.now = Ww.now + 100; nsw.Select.Reset()
+	check("...and Prayer of Spirit counts as having Divine Spirit: nothing left", press(Ew).attrs.type == nil)
+	WMw.db.self.choice.FIRE = "NONE"
 	Ww.units.player.auras = {}
 	Ww.now = Ww.now + 100; nsw.Select.Reset()
-	check("Warlock: Demon Armor beats Demon Skin once learned", press(Ew).attrs.spell == "Demon Armor")
-	WMw.db.selfChoice.ARMOR = "NONE"
-	Ww.now = Ww.now + 100; nsw.Select.Reset()
-	check("Warlock: armor set to None casts nothing", press(Ew).attrs.type == nil)
-	check("Forever has no Fel Armor or Sanctity Aura", WMw.caster.buffs.FEL_ARMOR == nil and WM.caster.buffs.SANCTITY == nil)
+	check("Priest: Inner Fire set to None skips it", press(Ew).attrs.spell == "Power Word: Fortitude")
+	nsw.StackSet(WMw.caster, P.SHADOW_PROT, "WARRIOR", true, WMw.db.party.stack)
+	check("Shadow Protection can be ticked per class, and is separate from the others (no exclusivity)",
+		nsw.StackEnabled(P.SHADOW_PROT, "WARRIOR", WMw.db.party.stack) and nsw.StackEnabled(P.FORTITUDE, "WARRIOR", WMw.db.party.stack))
+	check("Forever has no Sanctity Aura or Fel Armor", WM.caster.buffs.SANCTITY == nil and WMw.caster.buffs.FEL_ARMOR == nil)
 
 	-- Priest, Shaman, Hunter, Warrior: their own buffs, nothing on other players
 	local function selfClass(class, spells)
@@ -799,34 +851,40 @@ do
 		return WMx, nsx, Ex, Wx
 	end
 	do
-		local WMp, nsp, Ep = selfClass("PRIEST", { ["Inner Fire"] = 588 })
-		check("Priest: supported, self only, casts Inner Fire on itself", nsp.supported and WMp.caster.mode == "self" and press(Ep).attrs.spell == "Inner Fire")
-		local WMs, nss, Es, Ws = selfClass("SHAMAN", { ["Lightning Shield"] = 324 })
-		check("Shaman: Lightning Shield by default", press(Es).attrs.spell == "Lightning Shield")
-		learn(Ws, { ["Water Shield"] = 408510 })
-		WMs.db.selfChoice.SHIELD = "WATER_SHIELD"
-		Ws.now = Ws.now + 100; nss.Select.Reset()
-		check("Shaman: Water Shield when chosen", press(Es).attrs.spell == "Water Shield")
-		local WMh, nsh, Eh, Wh = selfClass("HUNTER", { ["Aspect of the Monkey"] = 13163 })
-		check("Hunter: 'best learned' falls back to Aspect of the Monkey", press(Eh).attrs.spell == "Aspect of the Monkey")
-		learn(Wh, { ["Aspect of the Hawk"] = 13165, ["Aspect of the Cheetah"] = 5118 })
-		Wh.now = Wh.now + 100; nsh.Select.Reset()
-		check("Hunter: ...and Aspect of the Hawk once learned", press(Eh).attrs.spell == "Aspect of the Hawk")
-		WMh.db.selfChoice.ASPECT = "CHEETAH"
-		Wh.now = Wh.now + 100; nsh.Select.Reset()
-		check("Hunter: a chosen aspect (Cheetah) overrides", press(Eh).attrs.spell == "Aspect of the Cheetah")
-		local WMw2, nsw2, Ew2 = selfClass("WARRIOR", { ["Battle Shout"] = 6673 })
-		check("Warrior: supported, casts Battle Shout on itself", nsw2.supported and press(Ew2).attrs.spell == "Battle Shout" and press(Ew2).attrs.unit == "player")
-		check("Rogue and Druid still have nothing, so they stay unsupported",
-			select(2, load({ class = "ROGUE", login = false })).supported == false and select(2, load({ class = "DRUID", login = false })).supported == false)
+		-- classes that can't buff other players do not load at all
+		for _, class in ipairs({ "WARLOCK", "WARRIOR", "HUNTER", "SHAMAN", "ROGUE" }) do
+			local WMx, nsx, Ex, Wx = load({ class = class })
+			check(class .. ": not supported, so WellMet creates nothing and prints nothing",
+				nsx.supported == false and WMx == nil and #Ex.frames == 0 and #Wx.prints == 0 and Ex.g.WellMetCast == nil)
+		end
+
+		-- Druid: Mark of the Wild on everyone by default, Thorns optional, Omen of Clarity on yourself
+		local WMd, nsd, Ed, Wd = selfClass("DRUID", { ["Mark of the Wild"] = 1126, ["Thorns"] = 467 })
+		local D = WMd.caster.buffs
+		check("Druid: supported, stack mode, Mark of the Wild and Thorns on others; no self-only buffs (Omen of Clarity is a passive on Forever)",
+			nsd.supported and WMd.caster.mode == "stack" and D.MARK.name == "Mark of the Wild" and D.THORNS.name == "Thorns"
+			and D.OMEN == nil and #WMd.caster.selfCategories == 0)
+		check("Druid: Mark of the Wild is on for every class by default, Thorns for none",
+			nsd.StackEnabled(D.MARK, "WARRIOR", WMd.db.party.stack) and nsd.StackEnabled(D.MARK, "MAGE", WMd.db.party.stack) and nsd.StackEnabled(D.MARK, "DRUID", WMd.db.party.stack)
+			and not nsd.StackEnabled(D.THORNS, "WARRIOR", WMd.db.party.stack))
+		check("Druid: on a fresh profile Thorns is OFF on yourself and in every section, Mark of the Wild is ON on yourself",
+			not nsd.StackEnabled(D.THORNS, "DRUID", WMd.db.self.stack) and nsd.StackEnabled(D.MARK, "DRUID", WMd.db.self.stack)
+			and not nsd.StackEnabled(D.THORNS, "DRUID", WMd.db.party.stack) and not nsd.StackEnabled(D.THORNS, "DRUID", WMd.db.others.stack))
+		check("Druid Self page: no own-buff dropdowns (nothing to choose), just the buffs on yourself",
+			Ed.g.WellMetSelfOwn ~= nil and Ed.g.WellMetSelfCatOMEN == nil and Ed.g.WellMetSelfCatARMOR == nil)
+		check("Druid: the first press casts Mark of the Wild on you", press(Ed).attrs.spell == "Mark of the Wild")
+		Wd.units.player.auras = { ["Gift of the Wild"] = true }
+		Wd.now = Wd.now + 100; nsd.Select.Reset()
+		Wd.prints = {}
+		check("...and Gift of the Wild counts as having Mark of the Wild", press(Ed).attrs.type == nil)
+		nsd.StackSet(WMd.caster, D.THORNS, "MAGE", true, WMd.db.party.stack)
+		check("Thorns can be ticked per class (it is a separate buff, not exclusive with Mark)", nsd.StackEnabled(D.THORNS, "MAGE", WMd.db.party.stack) and nsd.StackEnabled(D.MARK, "MAGE", WMd.db.party.stack))
 		check("none of the spells missing from Forever are in the data (Commanding Shout, Heart of the Lion, Viper, Falcon)",
 			not readFile("Data/Classes.lua"):find('name = "Commanding Shout"', 1, true) and not readFile("Data/Classes.lua"):find('name = "Aspect of the Viper"', 1, true)
 			and not readFile("Data/Classes.lua"):find('name = "Heart of the Lion"', 1, true) and not readFile("Data/Classes.lua"):find('name = "Aspect of the Falcon"', 1, true))
 	end
 
-	-- settings: a "Yourself" dropdown per category, before everything else
-	local dds = {}
-	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
+	-- settings: the Self panel's dropdowns, found by name
 	local function menu(dd)
 		local items = {}
 		dd.menuGen(dd, { CreateRadio = function(_, label, isSelected, setSelected, data)
@@ -836,21 +894,232 @@ do
 		end })
 		return items
 	end
-	-- placement: Yourself is in the right column (x past the left column), above the first class row
-	local selfPt, firstClassPt, radiusPt = dds[2].lastPoint, dds[3].lastPoint, dds[1].lastPoint
-	local fury2Pt, classPt = dds[3].lastPoint, dds[4].lastPoint
-	check("Yourself sits in the right column, above the class rows",
-		selfPt[2] > radiusPt[2] + 200 and selfPt[3] > classPt[3] and fury2Pt[3] < selfPt[3] and fury2Pt[3] > classPt[3])
-	local aura = menu(dds[2])      -- dds[1] is the radius
+	local aura = menu(E.g.WellMetSelfCatAURA)
 	check("Paladin settings: the Aura dropdown lists the 6 auras plus None; Devotion is selected",
 		#aura == 7 and aura[1].data == "DEVOTION" and aura[1].selected and aura[7].data == "NONE")
 	check("...an unlearned aura (Devotion, forgotten above) is greyed with a tooltip; a learned one (Retribution) is plain",
 		aura[1].label:find("808080", 1, true) ~= nil and aura[1].tooltip ~= nil and not aura[2].label:find("808080", 1, true) and aura[2].tooltip == nil)
-	local fury = menu(dds[3])
+	local fury = menu(E.g.WellMetSelfCatFURY)
 	check("Righteous Fury dropdown: the spell or None, None selected by default", #fury == 2 and fury[2].selected and fury[1].data == "RIGHTEOUS_FURY")
 	aura[3].pick()
-	check("picking an aura saves it", WM.db.selfChoice.AURA == "CONCENTRATION")
-	WM.db.selfChoice.AURA = nil
+	check("picking an aura saves it", WM.db.self.choice.AURA == "CONCENTRATION")
+	WM.db.self.choice.AURA = nil
+end
+
+----------------------------------------------------------------------
+print("== Sections (Self / Party-Raid / Others), migration, macro")
+do
+	-- defaults for a fresh profile
+	local WM, ns, E, W = load({ others = false })
+	check("a fresh profile: Self on, Party / Raid on, Others off, radius 0",
+		WM.db.self.enabled and WM.db.party.enabled and not WM.db.others.enabled and WM.db.party.radius == 0 and WM.db.others.radius == 0 and WM.db.schema == 2)
+
+	-- the settings tree: a main panel plus one sub-panel per section the class can use
+	local names = {}
+	for _, sub in ipairs(W.subcategories or {}) do names[#names + 1] = sub.name end
+	check("Paladin: sub-panels Self, Party / Raid, Others", table.concat(names, "|") == "Self|Party / Raid|Others")
+	for _, class in ipairs({ "MAGE", "DRUID", "PRIEST" }) do
+		local _, _, _, Wc = load({ class = class })
+		local cnames = {}
+		for _, sub in ipairs(Wc.subcategories or {}) do cnames[#cnames + 1] = sub.name end
+		check(class .. ": all three sub-panels (every supported class buffs other players)", table.concat(cnames, "|") == "Self|Party / Raid|Others")
+	end
+	local Ew = E
+	check("the Create macro button is on the main page (General), and not on the Self or Party / Raid pages",
+		E.g.WellMetMacroButton ~= nil and not readFile("UI/Options.lua"):find("buildMacroBlock", 1, true))
+	local mb = E.g.WellMetMacroButton
+	W.macros = {}
+	mb.scripts.OnClick(mb)
+	check("...and pressing it makes the macro", W.macros[1] and W.macros[1].name == "WM" and W.cursorMacro == 1)
+
+	-- opening a section
+	W.openedCategory = nil
+	WM:OpenOptions("party")
+	check("OpenOptions('party') opens the Party / Raid sub-panel", W.openedCategory == WM.optionsSub.party:GetID() and WM.optionsSub.party:GetID() ~= WM.optionsCategory:GetID())
+	WM:OpenOptions()
+	check("OpenOptions() opens the main panel", W.openedCategory == 1)
+	local slash = E.g.SlashCmdList.WELLMET
+	-- the three section checkboxes are one row, left to right, with no Open buttons
+	local ps, pp, po = E.g.WellMetShowSelf.lastPoint, E.g.WellMetShowParty.lastPoint, E.g.WellMetShowOthers.lastPoint
+	check("the section checkboxes sit side by side (same row, left to right)", ps[3] == pp[3] and pp[3] == po[3] and ps[2] < pp[2] and pp[2] < po[2])
+	check("...and there are no Open buttons on the main page", not readFile("UI/Options.lua"):find("openButtons", 1, true))
+	-- section pages follow the checkboxes on the main page
+	local rebuilt = 0
+	E.g.SettingsPanel = { GetCategoryList = function() return { CreateCategories = function() rebuilt = rebuilt + 1 end } end }
+	check("a fresh profile: Self and Party / Raid pages are listed, the Others page is hidden",
+		WM.optionsSub.self.redirectCategory == nil and WM.optionsSub.party.redirectCategory == nil and WM.optionsSub.others.redirectCategory == WM.optionsCategory)
+	W.openedCategory = nil; W.prints = {}
+	slash("others")
+	check("/wellmet others while Others is off: opens the main page and says to tick it", W.openedCategory == 1 and printed(W, "Others section is switched off"))
+	local box = E.g.WellMetShowOthers
+	box.checked = true
+	box.scripts.OnClick(box)
+	check("ticking Others on the main page switches the section on, shows its page and rebuilds the list",
+		WM.db.others.enabled == true and WM.optionsSub.others.redirectCategory == nil and rebuilt == 1)
+	slash("others"); check("/wellmet others", W.openedCategory == WM.optionsSub.others:GetID())
+	box.checked = false
+	box.scripts.OnClick(box)
+	check("unticking hides the page again", WM.db.others.enabled == false and WM.optionsSub.others.redirectCategory == WM.optionsCategory and rebuilt == 2)
+	E.g.WellMetShowSelf.checked = false
+	E.g.WellMetShowSelf.scripts.OnClick(E.g.WellMetShowSelf)
+	check("Self can be unticked too: its page goes, its switch is off", WM.db.self.enabled == false and WM.optionsSub.self.redirectCategory == WM.optionsCategory)
+	E.g.WellMetShowSelf.checked = true
+	E.g.WellMetShowSelf.scripts.OnClick(E.g.WellMetShowSelf)
+	WM.db.others.enabled = true; WM:ApplySectionVisibility()
+	check("the sub-pages have no switch of their own any more (the main page owns them)",
+		not readFile("UI/Options.lua"):find("buildEnableCheck", 1, true))
+	slash("raid"); check("/wellmet raid opens Party / Raid", W.openedCategory == WM.optionsSub.party:GetID())
+
+	-- independence: each section has its own switch, choices and radius
+	local function press2(WMx, Ex) local b = Ex.g.WellMetCast; b.scripts.PreClick(b, "LeftButton", true); return b end
+	local WM2, ns2, E2, W2 = load()
+	W2.groupSize = 1
+	addUnit(W2, "party1", { class = "WARRIOR", name = "Wally", guid = "G-wally", dist = 8, auras = {} })
+	addUnit(W2, "nameplate1", { class = "PRIEST", name = "Stranger", guid = "G-stranger", interact = "mid", auras = {} })
+	W2.plates = { "nameplate1" }
+	W2.units.player.auras = { ["Blessing of Wisdom"] = true, ["Devotion Aura"] = true }
+	W2.spells["Devotion Aura"] = 465; W2.known[465] = true
+	WM2.db.party.enabled = false
+	local cands = ns2.Discovery.Discover()
+	local sawGroup, sawStranger = false, false
+	for _, c in ipairs(cands) do if c.tier == 1 then sawGroup = true elseif c.tier == 2 then sawStranger = true end end
+	check("Party / Raid off: group members are not even looked at; strangers still are", not sawGroup and sawStranger)
+	WM2.db.party.enabled = true; WM2.db.others.enabled = false
+	cands = ns2.Discovery.Discover()
+	sawGroup, sawStranger = false, false
+	for _, c in ipairs(cands) do if c.tier == 1 then sawGroup = true elseif c.tier == 2 then sawStranger = true end end
+	check("Others off: strangers are not looked at; the group still is", sawGroup and not sawStranger)
+
+	-- self only: with the other two sections off the addon is just your own buffs
+	WM2.db.party.enabled = false; WM2.db.others.enabled = false
+	W2.units.player.auras = {}
+	local b = press(E2)
+	check("only Self on: the key casts your own buff and nothing else is considered", b.attrs.spell == "Devotion Aura" and b.attrs.unit == "player")
+	W2.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W2.now = W2.now + 100; ns2.Select.Reset()
+	check("...and with nothing of yours missing it casts nothing (the group and strangers are off)", press(E2).attrs.type == nil)
+	WM2.db.self.enabled = false
+	W2.units.player.auras = {}
+	W2.now = W2.now + 100; ns2.Select.Reset()
+	check("Self off: your own buffs are not cast", press(E2).attrs.type == nil)
+	WM2.db.self.enabled = true
+
+	-- separate radii
+	WM2.db.party.enabled = true; WM2.db.others.enabled = true
+	WM2.db.party.radius = 10; WM2.db.others.radius = 0
+	W2.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W2.units.party1.distSq = 15 * 15                           -- group member at 15 yards
+	local best, skipped = ns2.Select.Pick({ { unit = "party1", key = "G-wally", name = "Wally", tier = 1, class = "WARRIOR", order = 1 },
+		{ unit = "nameplate1", key = "G-s", name = "S", tier = 2, class = "PRIEST", order = 2 } }, { now = 100, settings = WM2.db, caster = WM2.caster, probe = ns2.Probe })
+	local reasons = {}
+	for _, sk in ipairs(skipped) do reasons[sk.cand.key] = sk.reason end
+	check("Party / Raid radius 10 skips a group member at 15 yd, while Others (radius 0) still takes strangers",
+		reasons["G-wally"] and reasons["G-wally"]:find("10 yd radius", 1, true) and best and best.cand.key == "G-s")
+	WM2.db.party.radius = 0
+
+	-- migration of a pre-sections profile keeps the same behavior
+	local WM3, ns3, E3 = load({ login = false })
+	E3.g.WellMetDB = { profile = { radius = 28, strangers = true, groupFirst = true, includeSelf = false, allowMounted = true, debug = true,
+		assign = { WARRIOR = "WISDOM" }, stack = {}, selfChoice = { AURA = "RETRIBUTION" }, unknownClass = "MIGHT" } }
+	WM3:InitDB()
+	local d = WM3.db
+	check("migration: strangers were on, so Others stays on; Self follows 'buff myself'; radius and choices carry over",
+		d.schema == 2 and d.others.enabled == true and d.party.enabled == true and d.self.enabled == false
+		and d.party.radius == 28 and d.others.radius == 28 and d.party.assign.WARRIOR == "WISDOM" and d.others.assign.WARRIOR == "WISDOM"
+		and d.self.choice.AURA == "RETRIBUTION" and d.allowMounted == true and d.debug == true)
+	check("...and the old flat keys are gone", d.radius == nil and d.strangers == nil and d.assign == nil and d.stack == nil and d.selfChoice == nil and d.includeSelf == nil and d.groupFirst == nil)
+	WM3:InitDB()
+	check("migrating twice changes nothing", WM3.db.party.radius == 28 and WM3.db.self.enabled == false)
+
+	-- the macro button
+	local WM4, ns4, E4, W4 = load()
+	WM4:CreateMacro()
+	check("Create macro: an account macro 'WM' with the picked icon and /click WellMetCast, on the cursor",
+		W4.macros[1] and W4.macros[1].name == "WM" and W4.macros[1].icon == 4630437 and W4.macros[1].body == "/click WellMetCast" and W4.cursorMacro == 1)
+	check("...and it says so", printed(W4, "created") and printed(W4, "cursor"))
+	W4.cursorMacro = nil; W4.prints = {}
+	WM4:CreateMacro()
+	check("pressing it again reuses the macro (no second copy) and puts it on the cursor", W4.macros[2] == nil and W4.cursorMacro == 1 and printed(W4, "cursor"))
+	W4.macros[1].body = "/cast Something Else"
+	W4.prints = {}; W4.cursorMacro = nil
+	WM4:CreateMacro()
+	check("a different macro already called WM is never overwritten", W4.macros[1].body == "/cast Something Else" and W4.cursorMacro == nil and printed(W4, "does something else"))
+	W4.macros = { { name = "a", body = "" }, { name = "b", body = "" }, { name = "c", body = "" } }
+	W4.prints = {}
+	WM4:CreateMacro()
+	check("account macros full: it makes a character macro instead", W4.macros[4] and W4.macros[4].name == "WM")
+	W4.macros = { { name = "a", body = "" }, { name = "b", body = "" }, { name = "c", body = "" }, { name = "d", body = "" }, { name = "e", body = "" } }
+	W4.prints = {}; W4.cursorMacro = nil
+	WM4:CreateMacro()
+	check("every slot full: it says so and creates nothing", W4.cursorMacro == nil and printed(W4, "No free macro slot"))
+	W4.macros = {}; W4.combat = true; W4.prints = {}
+	WM4:CreateMacro()
+	check("in combat: no macro is made", W4.macros[1] == nil and printed(W4, "combat"))
+	E4.g.SlashCmdList.WELLMET("macro")
+end
+
+----------------------------------------------------------------------
+print("== Chat probe")
+do
+	local WM, ns, E, W = load({ debug = false })
+	local slash = E.g.SlashCmdList.WELLMET
+	check("debug is off to begin with", WM.db.debug == false)
+	slash("probe")
+	check("/wellmet probe turns debug on (its findings are log lines) and listens to party, raid and instance chat",
+		WM.db.debug == true)
+	local chatFrame
+	for _, f in ipairs(E.frames) do local ev = rawget(f, "events"); if ev and ev.CHAT_MSG_PARTY then chatFrame = f end end
+	check("...registering all six chat events", chatFrame and chatFrame.events.CHAT_MSG_PARTY_LEADER and chatFrame.events.CHAT_MSG_RAID
+		and chatFrame.events.CHAT_MSG_RAID_LEADER and chatFrame.events.CHAT_MSG_INSTANCE_CHAT and chatFrame.events.CHAT_MSG_INSTANCE_CHAT_LEADER)
+
+	-- a readable message is logged with its text; a secret one is logged as SECRET
+	W.lockdown = false
+	chatFrame.scripts.OnEvent(chatFrame, "CHAT_MSG_PARTY", "!buff might", "Bob", "", "", "", "", 0, 0, "", 0, 1, "Player-1-bob")
+	addUnit(W, "hidden", { secretGuid = true })
+	local SECRET = E.g.UnitGUID("hidden")
+	W.lockdown = true; W.inInstance = true
+	chatFrame.scripts.OnEvent(chatFrame, "CHAT_MSG_RAID", SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 2, SECRET)
+	local report = WM:BuildReport()
+	check("a readable party message is logged with text, sender and guid, and the lockdown state",
+		report:find("probe chat CHAT_MSG_PARTY text=!buff might sender=Bob guid=Player-1-bob lockdown=false instance=false(none)", 1, true) ~= nil)
+	check("a secret raid message is logged as SECRET (text, sender and guid), with lockdown=true and the instance type",
+		report:find("probe chat CHAT_MSG_RAID text=SECRET sender=SECRET guid=SECRET lockdown=true instance=true(party)", 1, true) ~= nil)
+	W.lockdown = false; W.inInstance = false
+
+	-- sending
+	W.groupSize = 0
+	slash("probe send")
+	check("send with no group: nothing is sent, and it says why", #W.sent == 0 and printed(W, "Join a party"))
+	W.groupSize = 2
+	slash("probe send")
+	check("send in a party: one line goes to PARTY and the result is logged",
+		#W.sent == 1 and W.sent[1].chatType == "PARTY" and W.sent[1].msg:find("%[WellMet%] chat probe %(slash command%)") ~= nil
+		and WM:BuildReport():find("probe send slash command PARTY ok", 1, true) ~= nil)
+	W.raid = true
+	slash("probe send")
+	check("in a raid it goes to RAID", W.sent[2] and W.sent[2].chatType == "RAID")
+	W.raid = false
+	W.sendError = "chat restricted"
+	slash("probe send")
+	check("a refused send is caught and the error is logged", WM:BuildReport():find("probe send slash command PARTY ERROR", 1, true) ~= nil and #W.sent == 2)
+	W.sendError = nil
+
+	-- the next press sends (a key press, then a macro press), exactly once
+	local btn = E.g.WellMetCast
+	slash("probe press")
+	btn.scripts.PreClick(btn, "LeftButton", true)
+	check("probe press: the next KEY press sends one line", #W.sent == 3 and W.sent[3].msg:find("(key press)", 1, true) ~= nil)
+	btn.scripts.PreClick(btn, "LeftButton", false)
+	check("...and only that one press (the key's release does not send again)", #W.sent == 3)
+	slash("probe press")
+	W.now = W.now + 100
+	btn.scripts.PreClick(btn, "LeftButton", false)
+	check("probe press: a MACRO press (an up click) sends and is labelled as a macro press", #W.sent == 4 and W.sent[4].msg:find("(macro press)", 1, true) ~= nil)
+	check("a press when not armed sends nothing", (function() btn.scripts.PreClick(btn, "LeftButton", true); return #W.sent == 4 end)())
+
+	-- stop listening
+	slash("probe")
+	check("a second /wellmet probe stops listening", not chatFrame.events.CHAT_MSG_PARTY and not chatFrame.events.CHAT_MSG_RAID)
 end
 
 ----------------------------------------------------------------------
@@ -919,42 +1188,32 @@ do
 		end })
 		return items
 	end
-	local dds = {}
-	for _, f in ipairs(E.frames) do if f.template == "WowStyle1DropdownTemplate" then dds[#dds + 1] = f end end
-	local nSelf = #WM.caster.selfCategories      -- the "Yourself" dropdowns sit between the radius and the class rows
-	check("self dropdowns + radius + 9 classes, no cycle buttons and no 'class unreadable' row", #dds == nSelf + 10 and not readFile("UI/Options.lua"):find("Class unreadable", 1, true) and not readFile("UI/Options.lua"):find("cycle(", 1, true))
-	local radius = menuOf(dds[1])          -- order: radius (left column), then Yourself, then the class rows (right column)
+	local PARTY = "WellMetPartyClass"
+	local partyOrder = {}
+	for _, f in ipairs(E.frames) do if type(f.name) == "string" and f.name:find("^" .. PARTY) then partyOrder[#partyOrder + 1] = f.name:sub(#PARTY + 1) end end
+	check("Party / Raid has a dropdown per class, alphabetical (Druid ... Warrior), and no cycle buttons or 'class unreadable' row",
+		table.concat(partyOrder, ",") == "DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR"
+		and not readFile("UI/Options.lua"):find("Class unreadable", 1, true) and not readFile("UI/Options.lua"):find("cycle(", 1, true))
+	local radius = menuOf(E.g.WellMetPartyRadius)
 	check("radius dropdown lists cast range / 28 / 10 and marks the saved one", #radius == 3 and radius[1].selected and not radius[2].selected)
 	radius[2].pick()
-	check("picking 28 yards saves it", WM.db.radius == 28)
-	local warrior = menuOf(dds[nSelf + 10])         -- classes are alphabetical, so Warrior is the last class row
+	check("picking 28 yards saves it for Party / Raid only", WM.db.party.radius == 28 and WM.db.others.radius == 0)
+	local warrior = menuOf(E.g.WellMetPartyClassWARRIOR)
 	check("a class dropdown lists Might / Wisdom / Skip, each with a spell icon in the open list",
 		#warrior == 3 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
 		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Skip this class", 1, true) and warrior[3].label:find("|T", 1, true))
 	check("menu items carry their value, and the closed dropdown shows only the icon",
-		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and dds[nSelf + 10].selTranslator ~= nil
-		and dds[nSelf + 10].selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
+		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
+		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Might)", warrior[1].selected and not warrior[2].selected)
-	check("Hunter defaults to Wisdom, Rogue to Might", ns.AssignedKey("HUNTER") == "WISDOM" and ns.AssignedKey("ROGUE") == "MIGHT")
+	check("Hunter defaults to Wisdom, Rogue to Might", ns.AssignedKey(WM.db.party, "HUNTER") == "WISDOM" and ns.AssignedKey(WM.db.party, "ROGUE") == "MIGHT")
 	warrior[2].pick()
-	-- row order: picking "Skip" on each class row in turn must hit the classes alphabetically
-	do
-		local saved = WM.db.assign
-		WM.db.assign = {}
-		local order = {}
-		for i = nSelf + 2, nSelf + 10 do
-			menuOf(dds[i])[3].pick()
-			for k in pairs(WM.db.assign) do
-				local seen = false
-				for _, o in ipairs(order) do if o == k then seen = true end end
-				if not seen then order[#order + 1] = k end
-			end
-		end
-		check("class rows are alphabetical (Druid ... Warrior)", table.concat(order, ",") == "DRUID,HUNTER,MAGE,PALADIN,PRIEST,ROGUE,SHAMAN,WARLOCK,WARRIOR")
-		WM.db.assign = saved
-	end
-	check("picking Wisdom for Warrior saves it", WM.db.assign.WARRIOR == "WISDOM" and menuOf(dds[nSelf + 10])[2].selected)
-	WM.db.radius, WM.db.assign.WARRIOR = 0, nil     -- leave the settings as found
+	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
+		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
+		and menuOf(E.g.WellMetOthersClassWARRIOR)[1].selected)
+	menuOf(E.g.WellMetOthersClassWARRIOR)[3].pick()
+	check("...each section keeps its own table (Others: Skip, Party / Raid: Wisdom)", WM.db.others.assign.WARRIOR == "NONE" and WM.db.party.assign.WARRIOR == "WISDOM")
+	WM.db.party.radius, WM.db.party.assign.WARRIOR, WM.db.others.assign.WARRIOR = 0, nil, nil     -- leave the settings as found
 
 	-- report
 	W.groupSize = 1

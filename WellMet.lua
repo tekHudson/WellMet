@@ -147,8 +147,15 @@ function WM:SetupSlash()
 			WM:Print("debug: " .. (WM.db.debug and "ON (recording the log, showing press messages)" or "OFF") .. "  (/wellmet log opens the copyable log)")
 		elseif command == "forget" then
 			ns.Select.Reset(); WM:Print("forgot who was recently tried")
+		elseif command == "self" or command == "party" or command == "raid" or command == "others" then
+			local section = (command == "raid") and "party" or command
+			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
+		elseif command == "macro" then
+			WM:CreateMacro()
+		elseif command == "probe" then
+			WM:Probe(arg)
 		else
-			WM:Print("/wellmet — settings | log (or why) — copyable report | log clear | forget | debug  (set the key under Key Bindings > WellMet)")
+			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
 		end
 	end

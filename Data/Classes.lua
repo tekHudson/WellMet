@@ -11,8 +11,10 @@ local ADDON, ns = ...
 ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 
 -- Spell names and levels were checked against the Forever spellbook database (foreverchanges.pro/spellbook/<class>)
--- on 2026-10-06; Forever has no Sanctity Aura, Fel Armor, Commanding Shout, Heart of the Lion, or Aspect of the
--- Viper / Falcon (they appear in other addons' lists).
+-- on 2026-10-06; only spells you can actually CAST belong here (Omen of Clarity is a passive on Forever, so it is not
+-- listed); Forever has no Sanctity Aura (it appears in other addons' lists).
+-- Only classes that can buff OTHER players are supported (Paladin, Mage, Druid, Priest). On Warlock, Warrior, Hunter,
+-- Shaman and Rogue WellMet does not load at all: one self buff is nothing a key bind of the spell itself can't do.
 -- Buffs by CASTER class.
 --   buffs[key] = { name = English spell name, alt = { other names that also count as "has it" },
 --                  icon = texture shown in settings when the client can't resolve the spell (not learned yet) }
@@ -20,12 +22,11 @@ ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 --   mode       = "assign": one buff per TARGET class, chosen in settings (Paladin blessings).
 --                "stack":  several buffs per target, each switched on/off per target class (Mage).
 --   stack buffs also carry: defaultClasses (target classes it is ON for by default) and exclusive (the buff it replaces, so only one of the two can be on for a class).
---                "self":   nothing is cast on other players (Warlock); only the caster's own buffs.
 --   selfCategories = the caster's OWN buffs, one choice per category (an aura, an armor), cast on yourself
 --   first. A category is { key, title, default = <buff key | "AUTO" | "NONE">, choices = { buff keys },
 --   auto = { buff keys, best first }, autoLabel }. "AUTO" means the first buff in `auto` that is learned.
 --   Self buffs live in `buffs` with selfOnly = true and are not part of `order`.
--- Priest / Druid ("stack"): add here later.
+local ALL_CLASSES = { WARRIOR = true, PALADIN = true, HUNTER = true, ROGUE = true, PRIEST = true, SHAMAN = true, MAGE = true, WARLOCK = true, DRUID = true }
 local MANA_CLASSES = { PALADIN = true, PRIEST = true, SHAMAN = true, MAGE = true, WARLOCK = true, DRUID = true, HUNTER = true }
 
 ns.CasterData = {
@@ -71,66 +72,34 @@ ns.CasterData = {
 			  autoLabel = "Frost / Ice Armor (best learned)", choices = { "MAGE_ARMOR" } },
 		},
 	},
-	WARLOCK = {
-		mode = "self",
-		order = {},
+	DRUID = {
+		mode = "stack",
+		title = "Which buffs on which class",
+		order = { "MARK", "THORNS" },
 		buffs = {
-			DEMON_ARMOR = { key = "DEMON_ARMOR", selfOnly = true, name = "Demon Armor", icon = "Interface\\Icons\\Spell_Shadow_RagingScream" },
-			DEMON_SKIN  = { key = "DEMON_SKIN",  selfOnly = true, name = "Demon Skin",  icon = "Interface\\Icons\\Spell_Shadow_RagingScream" },
+			-- Gift of the Wild (the group version) also counts as having Mark of the Wild.
+			MARK   = { key = "MARK",   name = "Mark of the Wild", alt = { "Gift of the Wild" }, defaultClasses = ALL_CLASSES,
+			           icon = "Interface\\Icons\\Spell_Nature_Regeneration" },
+			THORNS = { key = "THORNS", name = "Thorns", defaultClasses = {}, icon = "Interface\\Icons\\Spell_Nature_Thorns" },
 		},
-		selfCategories = {
-			{ key = "ARMOR", title = "Armor", default = "AUTO", auto = { "DEMON_ARMOR", "DEMON_SKIN" },
-			  autoLabel = "Demon Skin / Armor (best learned)", choices = {} },
-		},
+		-- no selfCategories: Omen of Clarity is a passive in Forever (nothing to cast), and Druid forms are not buffs
 	},
-	-- Priest / Shaman / Hunter / Warrior: only their own buffs for now (names and levels from the Forever
-	-- spellbook; racial priest buffs, shaman weapon imbues and stances are left out on purpose).
 	PRIEST = {
-		mode = "self",
-		order = {},
+		mode = "stack",
+		title = "Which buffs on which class",
+		order = { "FORTITUDE", "SPIRIT", "SHADOW_PROT" },
 		buffs = {
-			INNER_FIRE = { key = "INNER_FIRE", selfOnly = true, name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire" },
+			-- The group versions (Prayer of ...) also count as having the single-target buff.
+			FORTITUDE   = { key = "FORTITUDE", name = "Power Word: Fortitude", alt = { "Prayer of Fortitude" }, defaultClasses = ALL_CLASSES,
+			                icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
+			SPIRIT      = { key = "SPIRIT", name = "Divine Spirit", alt = { "Prayer of Spirit" }, defaultClasses = MANA_CLASSES,
+			                icon = "Interface\\Icons\\Spell_Holy_DivineSpirit" },
+			SHADOW_PROT = { key = "SHADOW_PROT", name = "Shadow Protection", alt = { "Prayer of Shadow Protection" }, defaultClasses = {},
+			                icon = "Interface\\Icons\\Spell_Shadow_AntiShadow" },
+			INNER_FIRE  = { key = "INNER_FIRE", selfOnly = true, name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire" },
 		},
 		selfCategories = {
 			{ key = "FIRE", title = "Inner Fire", default = "INNER_FIRE", choices = { "INNER_FIRE" } },
-		},
-	},
-	SHAMAN = {
-		mode = "self",
-		order = {},
-		buffs = {
-			LIGHTNING_SHIELD = { key = "LIGHTNING_SHIELD", selfOnly = true, name = "Lightning Shield", icon = "Interface\\Icons\\Spell_Nature_LightningShield" },
-			WATER_SHIELD     = { key = "WATER_SHIELD",     selfOnly = true, name = "Water Shield",     icon = "Interface\\Icons\\INV_Misc_QuestionMark" },
-		},
-		selfCategories = {
-			{ key = "SHIELD", title = "Shield", default = "LIGHTNING_SHIELD", choices = { "LIGHTNING_SHIELD", "WATER_SHIELD" } },
-		},
-	},
-	HUNTER = {
-		mode = "self",
-		order = {},
-		buffs = {
-			HAWK    = { key = "HAWK",    selfOnly = true, name = "Aspect of the Hawk",    icon = "Interface\\Icons\\Spell_Nature_RavenForm" },
-			MONKEY  = { key = "MONKEY",  selfOnly = true, name = "Aspect of the Monkey",  icon = "Interface\\Icons\\Ability_Hunter_AspectOfTheMonkey" },
-			CHEETAH = { key = "CHEETAH", selfOnly = true, name = "Aspect of the Cheetah", icon = "Interface\\Icons\\Ability_Mount_JungleTiger" },
-			BEAST   = { key = "BEAST",   selfOnly = true, name = "Aspect of the Beast",   icon = "Interface\\Icons\\Ability_Mount_PinkTiger" },
-			PACK    = { key = "PACK",    selfOnly = true, name = "Aspect of the Pack",    icon = "Interface\\Icons\\Ability_Mount_WhiteTiger" },
-			WILD    = { key = "WILD",    selfOnly = true, name = "Aspect of the Wild",    icon = "Interface\\Icons\\Spell_Nature_ProtectionformNature" },
-		},
-		selfCategories = {
-			-- only one aspect can be active at a time
-			{ key = "ASPECT", title = "Aspect", default = "AUTO", auto = { "HAWK", "MONKEY" },
-			  autoLabel = "Hawk / Monkey (best learned)", choices = { "CHEETAH", "BEAST", "PACK", "WILD" } },
-		},
-	},
-	WARRIOR = {
-		mode = "self",
-		order = {},
-		buffs = {
-			BATTLE_SHOUT = { key = "BATTLE_SHOUT", selfOnly = true, name = "Battle Shout", icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
-		},
-		selfCategories = {
-			{ key = "SHOUT", title = "Shout", default = "BATTLE_SHOUT", choices = { "BATTLE_SHOUT" } },
 		},
 	},
 }

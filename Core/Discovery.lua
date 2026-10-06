@@ -109,17 +109,19 @@ function Discovery.Discover()
 
 	add("player", 0, 0)
 
-	for _, unit in ipairs(groupUnits()) do
-		if UnitExists(unit) and not UnitIsUnit(unit, "player") then
-			add(unit, 1, tonumber(unit:match("%d+")) or 0)
+	if WM.db.party.enabled then
+		for _, unit in ipairs(groupUnits()) do
+			if UnitExists(unit) and not UnitIsUnit(unit, "player") then
+				add(unit, 1, tonumber(unit:match("%d+")) or 0)
+			end
 		end
 	end
 
-	if UnitExists("target") and not UnitIsUnit("target", "player") then
+	if WM.db.others.enabled and UnitExists("target") and not UnitIsUnit("target", "player") then
 		add("target", 2)
 	end
 
-	if WM.db.strangers then
+	if WM.db.others.enabled then
 		local plates = C_NamePlate.GetNamePlates()
 		info.nameplates = plates and #plates or 0
 		for _, plate in ipairs(plates or {}) do

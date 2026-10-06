@@ -58,8 +58,8 @@ function WM:BuildReport()
 		local version, build, _, toc = GetBuildInfo()
 		add(string.format("addon %s | client %s (%s) interface %s", S(WM.version), S(version), S(build), S(toc)))
 		add(string.format("player=%s class=%s", S(WM.player), S(WM.classToken)))
-		add(string.format("radius=%s  strangers=%s  groupFirst=%s  includeSelf=%s  allowMounted=%s",
-			S(db.radius), yn(db.strangers), yn(db.groupFirst), yn(db.includeSelf), yn(db.allowMounted)))
+		add(string.format("sections: self=%s  party/raid=%s (radius %s)  others=%s (radius %s)  allowMounted=%s",
+			yn(db.self.enabled), yn(db.party.enabled), S(db.party.radius), yn(db.others.enabled), S(db.others.radius), yn(db.allowMounted)))
 		add("debug=" .. yn(db.debug))
 		add(string.format("inCombat=%s  mounted=%s  flying=%s  taxi=%s", yn(InCombatLockdown()), yn(IsMounted()), yn(IsFlying()), yn(UnitOnTaxi("player"))))
 	end)

@@ -44,14 +44,19 @@ local function clearArm(b)
 end
 
 -- The buff names for the "Nobody nearby needs ..." message. A stack caster only lists buffs that are
--- switched on for at least one target class.
+-- switched on for at least one target class in a section that is on.
 local function names(caster)
 	local list = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
-		local used = caster.mode ~= "stack" or ns.StackEnabled(buff, nil, WM.db.stack)
-		for _, class in ipairs(ns.TargetClasses) do
-			used = used or ns.StackEnabled(buff, class, WM.db.stack)
+		local used = caster.mode ~= "stack"
+		for _, sectionKey in ipairs(ns.SECTIONS) do
+			local section = WM.db[sectionKey]
+			if section.enabled then
+				for _, class in ipairs(ns.TargetClasses) do
+					used = used or ns.StackEnabled(buff, class, section.stack)
+				end
+			end
 		end
 		if used then list[#list + 1] = buff.name end
 	end
@@ -96,7 +101,7 @@ function WM:OnPress(b, fromMacro)
 		local msg = (list ~= "") and ("Nobody nearby needs " .. list .. ".") or "Nothing needs buffing right now."
 		if not ns.AurasReadable() then
 			msg = "Buff info is restricted right now (combat or an encounter), so WellMet can't tell who needs a buff."
-		elseif WM.db.strangers and ns.Discovery.NameplatesOn() == false then
+		elseif WM.db.others.enabled and ns.Discovery.NameplatesOn() == false then
 			msg = msg .. " Friendly player nameplates are OFF, so only your group can be found (turn them on in /wellmet)."
 		end
 		WM:Note(msg)

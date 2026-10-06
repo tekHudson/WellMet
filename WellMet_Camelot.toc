@@ -19,6 +19,8 @@ Core\Spells.lua
 Core\Discovery.lua
 Core\Select.lua
 Core\Cast.lua
+Core\Macro.lua
+Core\Probe.lua
 Core\Debug.lua
 UI\Options.lua
 UI\Minimap.lua

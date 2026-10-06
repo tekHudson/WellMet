@@ -51,19 +51,18 @@ end
 -- Which buffs does this target get? Returns a list of buffs, or nil + reason.
 --   assign mode (Paladin): exactly one, chosen per target class.
 --   stack mode  (Mage):    every buff switched on for the target class.
-function Select.BuffsFor(caster, class, settings)
-	if caster.mode == "self" then return nil, "this class only buffs itself" end
+function Select.BuffsFor(caster, class, cfg)
 	if not class then return nil, "class not readable, so no buff is chosen" end
 	if caster.mode == "stack" then
 		local list = {}
 		for _, key in ipairs(caster.order) do
 			local buff = caster.buffs[key]
-			if ns.StackEnabled(buff, class, settings.stack) then list[#list + 1] = buff end
+			if ns.StackEnabled(buff, class, cfg.stack) then list[#list + 1] = buff end
 		end
 		if #list == 0 then return nil, "no buffs are switched on for this class" end
 		return list
 	end
-	local key = settings.assign[class] or ns.DefaultAssign[class]
+	local key = cfg.assign[class] or ns.DefaultAssign[class]
 	if key == nil or key == "NONE" then return nil, "assignment: skip this class" end
 	local buff = caster.buffs[key]
 	if not buff then return nil, "no buff '" .. ns.SafeStr(key) .. "' for this caster" end
@@ -72,8 +71,8 @@ end
 
 -- The caster's own buff for one category (an aura, an armor), or nil (+ a reason when it can't be chosen).
 --   choice "NONE": nothing. "AUTO": the first spell in category.auto that is learned.
-function Select.SelfBuff(caster, cat, settings, isKnown)
-	local choice = (settings.selfChoice and settings.selfChoice[cat.key]) or cat.default
+function Select.SelfBuff(caster, cat, cfg, isKnown)
+	local choice = (cfg.choice and cfg.choice[cat.key]) or cat.default
 	if choice == nil or choice == "NONE" then return nil end
 	if choice == "AUTO" then
 		for _, key in ipairs(cat.auto) do
@@ -84,15 +83,10 @@ function Select.SelfBuff(caster, cat, settings, isKnown)
 	return caster.buffs[choice]
 end
 
-local function tierOf(entry, settings)
-	local t = entry.cand.tier
-	if t == 2 and settings.groupFirst == false then return 1 end
-	return t
-end
-
-local function before(settings)
+-- You, then your group, then everyone else; nearest first within each.
+local function before()
 	return function(a, b)
-		local ta, tb = tierOf(a, settings), tierOf(b, settings)
+		local ta, tb = a.cand.tier, b.cand.tier
 		if ta ~= tb then return ta < tb end
 		if a.dist ~= b.dist then return a.dist < b.dist end
 		if a.cand.order ~= b.cand.order then return a.cand.order < b.cand.order end
@@ -116,7 +110,7 @@ function Select.Pick(cands, ctx)
 	end
 
 	-- Why this (person, buff) pair can't be cast right now, or nil (+ the distance when it can).
-	local function whyNot(cand, buff)
+	local function whyNot(cand, buff, cfg)
 		if not known(buff) then return buff.name .. " is not learned" end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
 		if blocked then return string.format("tried recently (%.0fs left)", left) end
@@ -125,8 +119,9 @@ function Select.Pick(cands, ctx)
 			if r ~= true then return (r == false) and "out of cast range" or "range unknown" end
 		end
 		local dist = probe.distance(cand)
-		if (settings.radius or 0) > 0 and (not dist or dist > settings.radius) then
-			return "outside the " .. settings.radius .. " yd radius"
+		local radius = cfg.radius or 0
+		if radius > 0 and (not dist or dist > radius) then
+			return "outside the " .. radius .. " yd radius"
 		end
 		local lacks = probe.lacks(cand.unit, buff)
 		if lacks == false then return "already has " .. buff.name end
@@ -134,8 +129,8 @@ function Select.Pick(cands, ctx)
 		return nil, dist
 	end
 
-	local function add(cand, buff)
-		local reason, dist = whyNot(cand, buff)
+	local function add(cand, buff, cfg)
+		local reason, dist = whyNot(cand, buff, cfg)
 		if reason then
 			skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
 		else
@@ -143,41 +138,33 @@ function Select.Pick(cands, ctx)
 		end
 	end
 
-	local selfOnly = ctx.caster.mode == "self"        -- this class only buffs itself: other people aren't considered
 	local function consider(cand)
-		if selfOnly and cand.tier ~= 0 then return end
-		local gate
-		if cand.tier == 0 and not settings.includeSelf then
-			gate = "buffing yourself is turned off"
-		elseif cand.tier == 2 and not settings.strangers then
-			gate = "players outside the group are turned off"
-		end
-		if gate then
-			skipped[#skipped + 1] = { cand = cand, reason = gate }
+		local cfg = settings[ns.SECTION_OF_TIER[cand.tier]]
+		if not cfg.enabled then
+			skipped[#skipped + 1] = { cand = cand, reason = "the " .. ({ [0] = "Self", [1] = "Party / Raid", [2] = "Others" })[cand.tier] .. " section is switched off" }
 			return
 		end
 		if cand.tier == 0 then
 			-- your own buffs first (armor, aura, ...); they sort ahead of everything else
 			for _, cat in ipairs(ctx.caster.selfCategories) do
-				local buff, why = Select.SelfBuff(ctx.caster, cat, settings, known)
+				local buff, why = Select.SelfBuff(ctx.caster, cat, cfg, known)
 				if buff then
-					add(cand, buff)
+					add(cand, buff, cfg)
 				elseif why then
 					skipped[#skipped + 1] = { cand = cand, reason = why }
 				end
 			end
 		end
-		if selfOnly then return end
-		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, settings)
+		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, cfg)
 		if not buffs then
 			skipped[#skipped + 1] = { cand = cand, reason = why }
 			return
 		end
-		for _, buff in ipairs(buffs) do add(cand, buff) end
+		for _, buff in ipairs(buffs) do add(cand, buff, cfg) end
 	end
 
 	for _, cand in ipairs(cands) do consider(cand) end
 
-	table.sort(eligible, before(settings))
+	table.sort(eligible, before())
 	return eligible[1], skipped, eligible
 end
