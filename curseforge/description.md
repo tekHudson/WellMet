@@ -2,7 +2,7 @@
 
 Bind one key. Each press buffs **you**, then the **next person nearby who needs it**. Press again and it moves on. No target-clicking, no raid frames, no tracking window. It only answers "who needs what right now?" when you press.
 
-**Built for WoW Forever (beta, Interface 16001).** This is an early test release.
+**Built for WoW Forever (Interface 16001).**
 
 ## Who it's for
 
@@ -42,7 +42,7 @@ Commands: `/wellmet` (settings), `/wellmet self`, `party`, `others`, `/wellmet m
 
 ## Test status
 
-Paladin (blessings), Mage (armor, Arcane Intellect) and Druid are tested in game. **Built but not yet tried in game:** Priest, Mage Dampen and Amplify Magic, Paladin auras beyond Devotion, and Righteous Fury. Bug reports are welcome: [GitHub issues](https://github.com/tekHudson/WellMet/issues).
+Paladin (blessings), Mage (armor, Arcane Intellect), Druid and Priest (Power Word: Fortitude) are tested in game. **Built but not yet tried in game:** Priest's Divine Spirit, Shadow Protection and Inner Fire, Mage Dampen and Amplify Magic, Paladin auras beyond Devotion, and Righteous Fury. Bug reports are welcome: [GitHub issues](https://github.com/tekHudson/WellMet/issues).
 
 ## Credits and license
 

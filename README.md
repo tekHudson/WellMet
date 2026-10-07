@@ -2,7 +2,7 @@
 
 One key buffs the next nearby player who needs it. Built for **WoW Forever** (Interface 16001).
 
-> **Beta.** This is an early test release (0.1.0-beta.1). It only works on the WoW Forever beta client.
+> Version 1.0.0. It only works on the WoW Forever client (Interface 16001).
 
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.

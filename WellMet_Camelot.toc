@@ -2,7 +2,7 @@
 ## Title: WellMet
 ## Notes: One key buffs the next nearby player who needs it. Built for WoW Forever.
 ## Author: tek
-## Version: 0.1.0-beta.1
+## Version: 1.0.0
 ## DefaultState: enabled
 ## X-Curse-Project-ID: 1730687
 ## X-License: MIT

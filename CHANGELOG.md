@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-10-07
 ### Added
 - Paladin: **Blessing of Kings**, **Blessing of Salvation** and **Blessing of Light** (with Might and Wisdom, the five
   blessings you keep up for an hour on Forever). One blessing per target class, since a Paladin can only have one
