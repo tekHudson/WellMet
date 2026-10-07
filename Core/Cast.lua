@@ -211,6 +211,7 @@ local function pendingRecent()
 	local p = WM.pending
 	if p and GetTime() - p.at < 4 then return p end
 end
+ns.PendingRecent = pendingRecent
 
 local function onSent(_, _, castGUID, spellID)
 	local p = pendingRecent()

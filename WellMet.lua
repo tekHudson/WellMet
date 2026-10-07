@@ -27,7 +27,7 @@ WM.version = C_AddOns.GetAddOnMetadata(ADDON, "Version") or "0"
 
 -- Shown in the /wellmet log overview so a stale copy is obvious. On `development` it is bumped with every commit
 -- ("dev.N"); the release / merge to `main` sets it to "release".
-ns.BUILD = "dev.4"
+ns.BUILD = "dev.5"
 
 ----------------------------------------------------------------------
 -- Debug log: a ring buffer that is filled ONLY while the debug setting is on (written on

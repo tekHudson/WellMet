@@ -23,15 +23,26 @@ local evFrame = CreateFrame("Frame")
 for _, e in ipairs({ "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_SUCCEEDED", "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_INTERRUPTED" }) do
 	pcall(evFrame.RegisterUnitEvent, evFrame, e, "player")
 end
-for _, e in ipairs({ "UI_ERROR_MESSAGE", "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN" }) do
+for _, e in ipairs({ "ADDON_ACTION_BLOCKED", "ADDON_ACTION_FORBIDDEN" }) do
 	pcall(evFrame.RegisterEvent, evFrame, e)
+end
+-- Only WellMet's own casts (and anything right after one of its presses) belong in the log: everything else the
+-- player casts (Smite, Skinning, Attack ...) just buries the useful lines. UI_ERROR_MESSAGE is logged by Core/Cast.lua.
+local function isOurSpell(name)
+	if not name or not WM.caster then return false end
+	for _, buff in pairs(WM.caster.buffs) do
+		if buff.name == name then return true end
+	end
+	return false
 end
 evFrame:SetScript("OnEvent", function(_, event, ...)
 	local parts = {}
 	for i = 1, select("#", ...) do parts[i] = S((select(i, ...))) end
 	if event:find("^UNIT_SPELLCAST") then
 		local id = tonumber(parts[event == "UNIT_SPELLCAST_SENT" and 4 or 3])
-		if id then parts[#parts + 1] = "[" .. S(ns.SpellName(id)) .. "]" end
+		local name = id and ns.SpellName(id)
+		if not (isOurSpell(name) or (ns.PendingRecent and ns.PendingRecent())) then return end
+		if id then parts[#parts + 1] = "[" .. S(name) .. "]" end
 	end
 	WM:Log("evt", event, table.concat(parts, " "))
 end)

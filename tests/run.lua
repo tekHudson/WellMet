@@ -1451,6 +1451,30 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Log filter: only WellMet's own casts")
+do
+	local WM, ns, E, W = load()
+	local ev
+	for _, f in ipairs(E.frames) do
+		if rawget(f, "scripts") and f.scripts.OnEvent and f ~= ns.castFrame and rawget(f, "name") == nil then ev = f end
+	end
+	check("the raw cast-event logger frame exists", ev ~= nil)
+	local names = { [585] = "Smite", [19834] = "Blessing of Might", [8613] = "Skinning" }
+	E.g.C_Spell.GetSpellName = function(id) return names[id] end
+	local function log() return WM:BuildReport() end
+	W.now = W.now + 100; WM.pending = nil
+	ev.scripts.OnEvent(ev, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-1", 585)
+	ev.scripts.OnEvent(ev, "UNIT_SPELLCAST_SENT", "player", "Bob", "Cast-2", 8613)
+	check("a spell that is not ours (Smite, Skinning) is not logged", not log():find("[Smite]", 1, true) and not log():find("[Skinning]", 1, true))
+	ev.scripts.OnEvent(ev, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-3", 19834)
+	check("one of our own buffs (Blessing of Might) is logged", log():find("[Blessing of Might]", 1, true) ~= nil)
+	WM.pending = { key = "k", spell = "Blessing of Might", name = "Bob", at = E.g.GetTime() }
+	ev.scripts.OnEvent(ev, "UNIT_SPELLCAST_FAILED", "player", "Cast-4", 585)
+	check("right after a WellMet press any cast event is logged (it may explain a failure)", log():find("[Smite]", 1, true) ~= nil)
+	WM.pending = nil
+end
+
+----------------------------------------------------------------------
 print("== Minimap button")
 do
 	local WM, ns, E, W = load()

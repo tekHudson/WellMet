@@ -21,6 +21,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   button. The log overview now names the build, so a stale copy is easy to spot.
 - The "Nobody nearby needs ..." message names only the buffs that are assigned somewhere.
 
+### Changed
+- The debug log keeps only WellMet's own casts (and any cast event within a few seconds of one of its presses),
+  instead of every spell you cast, and no longer lists each error message twice.
+
 ### Fixed
 - The key button is disarmed after every click, so a press in combat (when the game won't let an addon change the
   button) can no longer repeat the previous cast on the previous unit.
