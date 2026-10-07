@@ -5,6 +5,18 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- Paladin: **Blessing of Kings**, **Blessing of Salvation** and **Blessing of Light** (with Might and Wisdom, the five
+  blessings you keep up for an hour on Forever). One blessing per target class, since a Paladin can only have one
+  blessing on a target at a time; the Greater versions count as already having it. Blessing of Protection, Freedom and
+  Sacrifice last only 10 to 30 seconds and are left out. Forever has no Sanctuary.
+- Salvation, Dampen Magic and Amplify Magic say "party member", so they are offered for your group (and for yourself)
+  and never for strangers: they are left out of the Others settings, and refused if one is ever set for a stranger.
+- The "Nobody nearby needs ..." message names only the buffs that are assigned somewhere.
+
+### Fixed
+- Strangers' full names are found whatever the nameplate's text field is called, and when they can't be read the log
+  says why (hidden name, hidden plate text, or what the plate showed instead).
 
 ## [0.1.0-beta.1] - 2026-10-06
 First public test release, for WoW Forever (beta, Interface 16001) only.

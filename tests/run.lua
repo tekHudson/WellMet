@@ -132,7 +132,7 @@ local function newEnv(W)
 	g.UnitIsConnected = function(u) return U(u) and U(u).connected end
 	g.UnitIsVisible = function(u) return U(u) and U(u).visible end
 	g.UnitGUID = function(u) local x = U(u); if not x then return nil end; if x.secretGuid then return SECRET end; return x.guid end
-	g.UnitName = function(u) return U(u) and U(u).name end
+	g.UnitName = function(u) local x = U(u); if x and x.secretName then return SECRET end; return x and x.name end
 	g.UnitClass = function(u) local x = U(u); if not x then return nil end; if x.secretClass then return SECRET, SECRET end; return x.class, x.class end
 	g.UnitIsUnit = function(a, b) return U(a) and U(b) and U(a).guid == U(b).guid end
 	g.UnitDistanceSquared = function(u) local x = U(u); if not x then return 0, false end; return x.distSq or 0, x.checked end
@@ -164,7 +164,7 @@ local function newEnv(W)
 	}
 	g.C_NamePlate = { GetNamePlates = function() local t = {} for i, tok in ipairs(W.plates) do local u = W.units[tok]
 		t[i] = { GetUnit = function() return tok end,
-			UnitFrame = { name = { GetText = function() return u and (u.plateText or (u.name .. " Surname")) end } } } end return t end }
+			UnitFrame = u and u.plateFrame or { name = { GetText = function() return u and (u.plateText or (u.name .. " Surname")) end } } } end return t end }
 
 	-- bindings
 	g.Minimap = { GetWidth = function() return 198 end, GetCenter = function() return 0, 0 end, GetEffectiveScale = function() return 1 end }
@@ -416,6 +416,32 @@ do
 	check("a plate whose text isn't 'First Last' is rejected with a reason", full.Bob == nil and full.Cyd == nil
 		and #rejected == 2 and rejected[1].reason:find("full name", 1, true) ~= nil)
 
+	-- the name text can live under any field name (it moved between builds), and failures say why
+	addUnit(W, "nameplate10", { class = "MAGE", name = "Zed" })
+	W.units.nameplate10.plateFrame = { Level = { GetText = function() return "60" end }, NameText = { GetText = function() return "Zed Quinn" end } }
+	W.plates = { "nameplate10" }
+	list = D.Discover()
+	local zed
+	for _, c in ipairs(list) do if c.name == "Zed" then zed = c end end
+	check("the full name is found whatever the text field is called (here 'NameText', next to a level field)", zed and zed.fullName == "Zed Quinn")
+	local function whyRejected(plateFrame, mutate)
+		addUnit(W, "nameplate11", { class = "MAGE", name = "Yan" })
+		W.units.nameplate11.plateFrame = plateFrame
+		if mutate then mutate(W.units.nameplate11) end
+		W.plates = { "nameplate11" }
+		local _, rej = D.Discover()
+		return rej[1] and rej[1].reason or ""
+	end
+	local why = whyRejected({ name = { GetText = function() return SECRET end } })
+	check("hidden plate text: rejected, and the reason says the text is hidden", why:find("full name not readable", 1, true) and why:find("hidden", 1, true))
+	why = whyRejected({ name = { GetText = function() return "Yan" end } }, function(u) u.secretName = true end)
+	check("hidden UnitName: the reason says UnitName is hidden", why:find("UnitName is hidden", 1, true) ~= nil)
+	why = whyRejected({ name = { GetText = function() return "Yan Vale Esq" end }, Guild = { GetText = function() return "<The Guild>" end } })
+	check("an extra word on the plate: the reason shows what the plate DID say, so a new format is easy to spot",
+		why:find("saw: Yan Vale Esq | <The Guild>", 1, true) ~= nil or why:find("saw: <The Guild> | Yan Vale Esq", 1, true) ~= nil)
+	why = whyRejected({})
+	check("a plate with no text at all: the reason says so", why:find("no readable text", 1, true) ~= nil)
+
 	-- strangers off: nameplates ignored
 	WM.db.others.enabled = false
 	W.plates = { "nameplate1" }
@@ -645,13 +671,23 @@ do
 	best = Select.Pick({ cand("r", "ROGUE") }, ctx(s))
 	check("Rogue gets nothing by default", best == nil)
 
-	-- stacking
+	-- stacking (Dampen Magic only works on party members, so these are group members)
+	local function member(key, class, order) return { unit = key, key = key, name = key, tier = 1, class = class, order = order or 1 } end
 	ns.StackSet(WM.caster, B.DAMPEN, "PRIEST", true, WM.db.party.stack)
-	local _, _, el = Select.Pick({ cand("p", "PRIEST") }, ctx(mkSettings({ stack = WM.db.party.stack })))
+	local _, _, el = Select.Pick({ member("p", "PRIEST") }, ctx(mkSettings({ stack = WM.db.party.stack })))
 	check("with Dampen on, one person yields Intellect then Dampen", #el == 2 and el[1].buff.key == "INTELLECT" and el[2].buff.key == "DAMPEN")
 	Select.Mark("p", "Arcane Intellect", 8, 100)
-	best = Select.Pick({ cand("p", "PRIEST"), cand("q", "PRIEST", 2) }, ctx(mkSettings({ stack = WM.db.party.stack })))
+	best = Select.Pick({ member("p", "PRIEST"), member("q", "PRIEST", 2) }, ctx(mkSettings({ stack = WM.db.party.stack })))
 	check("after Intellect was just cast, the next press does Dampen on the same person", best.cand.key == "p" and best.buff.key == "DAMPEN")
+	Select.Reset()
+	-- ...and never on a stranger: the spell says "party member"
+	local _, sk, elS = Select.Pick({ cand("stranger", "PRIEST") }, ctx(mkSettings({ stack = WM.db.party.stack })))
+	local dampenSkip
+	for _, x in ipairs(sk) do if x.buff and x.buff.key == "DAMPEN" then dampenSkip = x.reason end end
+	check("Dampen Magic is refused for a stranger, with the reason", dampenSkip and dampenSkip:find("only works on party and raid members", 1, true) ~= nil)
+	local strangerKeys = {}
+	for _, e in ipairs(elS) do strangerKeys[#strangerKeys + 1] = e.buff.key end
+	check("...while Arcane Intellect is still offered for that stranger", table.concat(strangerKeys, ",") == "INTELLECT")
 	Select.Reset()
 
 	-- Dampen / Amplify replace each other
@@ -1051,6 +1087,84 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Paladin blessings (Kings, Salvation, Light)")
+do
+	local WM, ns, E, W = load()
+	local function learn(list) for name, id in pairs(list) do W.spells[name] = id; W.known[id] = true end end
+	learn({ ["Blessing of Kings"] = 20217, ["Blessing of Salvation"] = 1038, ["Blessing of Light"] = 19977 })
+	local P = WM.caster.buffs
+	local keys = {}
+	for _, k in ipairs(WM.caster.order) do keys[#keys + 1] = k end
+	check("Paladin blessings: Might, Wisdom, Kings, Salvation, Light",
+		table.concat(keys, ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT" and P.KINGS.name == "Blessing of Kings"
+		and P.SALVATION.name == "Blessing of Salvation" and P.LIGHT.name == "Blessing of Light")
+	check("the short utility blessings (Protection, Freedom, Sacrifice) and Sanctuary are not in the data",
+		P.PROTECTION == nil and P.FREEDOM == nil and P.SACRIFICE == nil and P.SANCTUARY == nil)
+	check("only Salvation is party-only among the blessings", P.SALVATION.partyOnly == true and not P.KINGS.partyOnly and not P.MIGHT.partyOnly and not P.LIGHT.partyOnly)
+
+	local function member(key, class, tier) return { unit = key, key = key, name = key, tier = tier or 1, class = class, order = 1 } end
+	local function pick(c) return ns.Select.Pick({ c }, { now = 100, settings = WM.db, caster = WM.caster, probe = ns.Probe }) end
+	addUnit(W, "party1", { class = "WARRIOR", name = "Wally", guid = "G-wally", dist = 5, auras = {} })
+	W.groupSize = 1
+
+	WM.db.party.assign.WARRIOR = "KINGS"
+	local best = pick(member("party1", "WARRIOR"))
+	check("assign Kings to Warrior: a Warrior group member gets Blessing of Kings", best and best.buff.key == "KINGS")
+	W.units.party1.auras = { ["Greater Blessing of Kings"] = true }
+	local b2, skipped = pick(member("party1", "WARRIOR"))
+	check("Greater Blessing of Kings counts as already having Kings", b2 == nil and skipped[1].reason:find("already has Blessing of Kings", 1, true) ~= nil)
+	W.units.party1.auras = { ["Blessing of Kings"] = true, ["Blessing of Might"] = false }
+	check("a person with ANOTHER blessing from you-or-anyone still needs the one you assigned (Might is not Kings)",
+		pick(member("party1", "WARRIOR")) == nil)
+	W.units.party1.auras = { ["Blessing of Might"] = true }
+	check("...but someone with only Might (Kings assigned) is offered Kings", pick(member("party1", "WARRIOR")) and pick(member("party1", "WARRIOR")).buff.key == "KINGS")
+	W.units.party1.auras = {}
+
+	-- Salvation only works on party members
+	WM.db.party.assign.WARRIOR = "SALVATION"; WM.db.others.assign.WARRIOR = "SALVATION"
+	W.known[1038] = true
+	check("Salvation on a group member is offered", pick(member("party1", "WARRIOR", 1)) and pick(member("party1", "WARRIOR", 1)).buff.key == "SALVATION")
+	local bS, skS = pick(member("nameplate1", "WARRIOR", 2))
+	check("Salvation on a stranger is refused, with the reason", bS == nil and skS[1].reason:find("only works on party and raid members", 1, true) ~= nil)
+	WM.db.party.assign.WARRIOR = nil; WM.db.others.assign.WARRIOR = nil
+
+	-- settings: Salvation is offered for Party / Raid and Self but not for Others
+	local function items(dd)
+		local list = {}
+		dd.menuGen(dd, { CreateRadio = function(_, label, _, _, data) list[#list + 1] = data; return { SetTooltip = function() end } end })
+		return list
+	end
+	check("Party / Raid dropdown offers all five blessings plus Skip",
+		table.concat(items(E.g.WellMetPartyClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
+	check("Others dropdown leaves Salvation out (strangers can't get it)",
+		table.concat(items(E.g.WellMetOthersClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,LIGHT,NONE")
+	check("the Self 'Blessing' dropdown offers all five", table.concat(items(E.g.WellMetSelfOwn), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
+
+	-- the "nobody needs ..." line names only the blessings that are assigned somewhere
+	W.plates = {}; W.groupSize = 0; W.units.party1 = nil          -- nobody else around
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W.spells["Devotion Aura"] = 465; W.known[465] = true
+	W.prints = {}
+	press(E)
+	check("by default the message names only Might and Wisdom (not every blessing the Paladin knows)",
+		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom."))
+	WM.db.party.assign.WARRIOR = "KINGS"
+	W.now = W.now + 100; ns.Select.Reset(); W.prints = {}
+	press(E)
+	check("...and adds Kings once a class is assigned Kings", printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings."))
+
+	-- Mage: Dampen / Amplify are also party-only, so the Others table leaves them out
+	local WMm, nsm, Em = load({ class = "MAGE" })
+	local function checks(dd)
+		local list = {}
+		dd.menuGen(dd, { CreateCheckbox = function(_, label, _, _, data) list[#list + 1] = data; return { SetTooltip = function() end } end })
+		return list
+	end
+	check("Mage Party / Raid table offers Intellect, Dampen, Amplify", table.concat(checks(Em.g.WellMetPartyClassPRIEST), ",") == "INTELLECT,DAMPEN,AMPLIFY")
+	check("Mage Others table offers only Intellect (Dampen and Amplify are party-only)", table.concat(checks(Em.g.WellMetOthersClassPRIEST), ",") == "INTELLECT")
+end
+
+----------------------------------------------------------------------
 print("== Minimap button")
 do
 	local WM, ns, E, W = load()
@@ -1127,11 +1241,13 @@ do
 	radius[2].pick()
 	check("picking 28 yards saves it for Party / Raid only", WM.db.party.radius == 28 and WM.db.others.radius == 0)
 	local warrior = menuOf(E.g.WellMetPartyClassWARRIOR)
-	check("a class dropdown lists Might / Wisdom / Skip, each with a spell icon in the open list",
-		#warrior == 3 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
-		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Skip this class", 1, true) and warrior[3].label:find("|T", 1, true))
+	check("a Party / Raid class dropdown lists Might / Wisdom / Kings / Salvation / Light / Skip, each with an icon in the open list",
+		#warrior == 6 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
+		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Blessing of Kings", 1, true)
+		and warrior[4].label:find("Blessing of Salvation", 1, true) and warrior[5].label:find("Blessing of Light", 1, true)
+		and warrior[6].label:find("Skip this class", 1, true) and warrior[6].label:find("|T", 1, true))
 	check("menu items carry their value, and the closed dropdown shows only the icon",
-		warrior[1].data == "MIGHT" and warrior[3].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
+		warrior[1].data == "MIGHT" and warrior[3].data == "KINGS" and warrior[6].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
 		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Might)", warrior[1].selected and not warrior[2].selected)
 	check("Hunter defaults to Wisdom, Rogue to Might", ns.AssignedKey(WM.db.party, "HUNTER") == "WISDOM" and ns.AssignedKey(WM.db.party, "ROGUE") == "MIGHT")
@@ -1139,7 +1255,7 @@ do
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
 		and menuOf(E.g.WellMetOthersClassWARRIOR)[1].selected)
-	menuOf(E.g.WellMetOthersClassWARRIOR)[3].pick()
+	menuOf(E.g.WellMetOthersClassWARRIOR)[5].pick()          -- the last item in Others is Skip (Salvation is not offered there)
 	check("...each section keeps its own table (Others: Skip, Party / Raid: Wisdom)", WM.db.others.assign.WARRIOR == "NONE" and WM.db.party.assign.WARRIOR == "WISDOM")
 	WM.db.party.radius, WM.db.party.assign.WARRIOR, WM.db.others.assign.WARRIOR = 0, nil, nil     -- leave the settings as found
 

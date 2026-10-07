@@ -21,6 +21,7 @@ ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 --   order      = display/cycle order of the keys
 --   mode       = "assign": one buff per TARGET class, chosen in settings (Paladin blessings).
 --                "stack":  several buffs per target, each switched on/off per target class (Mage).
+--   partyOnly = true: the spell works on "party member"s only, so strangers are never offered it.
 --   stack buffs also carry: defaultClasses (target classes it is ON for by default) and exclusive (the buff it replaces, so only one of the two can be on for a class).
 --   selfCategories = the caster's OWN buffs, one choice per category (an aura, an armor), cast on yourself
 --   first. A category is { key, title, default = <buff key | "AUTO" | "NONE">, choices = { buff keys },
@@ -33,10 +34,19 @@ ns.CasterData = {
 	PALADIN = {
 		mode = "assign",
 		title = "Which blessing on which class",
-		order = { "MIGHT", "WISDOM" },
+		-- Every blessing you keep up for an hour on Forever (spellbook, checked 2026-10-06): Might (level 4), Wisdom (14),
+		-- Kings (20), Salvation (26), Light (40); the Greater versions count as "has it". A Paladin can only have ONE
+		-- blessing on a target at a time, so the per-class choice is one blessing (or none). Left out on purpose because
+		-- they last 10-30 seconds and are not buffs to keep up: Protection, Freedom, Sacrifice. Forever has no Sanctuary.
+		-- partyOnly: the spell says "party member", so it is never offered for strangers.
+		order = { "MIGHT", "WISDOM", "KINGS", "SALVATION", "LIGHT" },
 		buffs = {
 			MIGHT  = { key = "MIGHT",  name = "Blessing of Might",  alt = { "Greater Blessing of Might" },  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice" },
 			WISDOM = { key = "WISDOM", name = "Blessing of Wisdom", alt = { "Greater Blessing of Wisdom" }, icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom" },
+			KINGS  = { key = "KINGS",  name = "Blessing of Kings",  alt = { "Greater Blessing of Kings" },  icon = "Interface\\Icons\\Spell_Magic_MageArmor" },
+			SALVATION = { key = "SALVATION", name = "Blessing of Salvation", alt = { "Greater Blessing of Salvation" }, partyOnly = true,
+			              icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation" },
+			LIGHT  = { key = "LIGHT",  name = "Blessing of Light",  alt = { "Greater Blessing of Light" },  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
 			DEVOTION      = { key = "DEVOTION",      selfOnly = true, name = "Devotion Aura",          icon = "Interface\\Icons\\Spell_Holy_DevotionAura" },
 			RETRIBUTION   = { key = "RETRIBUTION",   selfOnly = true, name = "Retribution Aura",       icon = "Interface\\Icons\\Spell_Holy_AuraOfLight" },
 			CONCENTRATION = { key = "CONCENTRATION", selfOnly = true, name = "Concentration Aura",     icon = "Interface\\Icons\\Spell_Holy_MindSooth" },
@@ -59,9 +69,9 @@ ns.CasterData = {
 			-- Arcane Brilliance (the group version) also counts as having it.
 			INTELLECT = { key = "INTELLECT", name = "Arcane Intellect", alt = { "Arcane Brilliance" }, defaultClasses = MANA_CLASSES,
 			icon = "Interface\\Icons\\Spell_Holy_MagicalSentry" },
-			DAMPEN    = { key = "DAMPEN",    name = "Dampen Magic",     defaultClasses = {}, exclusive = "AMPLIFY",
+			DAMPEN    = { key = "DAMPEN",    name = "Dampen Magic",     defaultClasses = {}, exclusive = "AMPLIFY", partyOnly = true,
 			icon = "Interface\\Icons\\Spell_Nature_AbolishMagic" },
-			AMPLIFY   = { key = "AMPLIFY",   name = "Amplify Magic",    defaultClasses = {}, exclusive = "DAMPEN",
+			AMPLIFY   = { key = "AMPLIFY",   name = "Amplify Magic",    defaultClasses = {}, exclusive = "DAMPEN", partyOnly = true,
 			icon = "Interface\\Icons\\Spell_Holy_FlashHeal" },
 			ICE_ARMOR   = { key = "ICE_ARMOR",   selfOnly = true, name = "Ice Armor",   icon = "Interface\\Icons\\Spell_Frost_FrostArmor02" },
 			FROST_ARMOR = { key = "FROST_ARMOR", selfOnly = true, name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02" },

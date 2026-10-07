@@ -38,17 +38,34 @@ end
 
 -- Forever names are "First Last", but UnitName on a stranger gives only the first word.
 -- `/targetexact` needs the whole name, and the only place it is readable is the text on the
--- player's own nameplate. Returns "First Last", or nil if the plate doesn't show exactly that.
+-- player's own nameplate. The name's FontString has been named differently from build to build, so
+-- every text field on the plate (its UnitFrame first, then the plate itself) is looked at, and the
+-- one that reads exactly "<their first name> <one more word>" is the full name.
+-- Returns "First Last", or nil + a plain reason (what was hidden or what the plate showed instead).
 local function plateFullName(plate, firstName)
+	if type(firstName) ~= "string" then return nil, "UnitName is hidden" end
+	local seen, hidden = {}, 0
+	local function look(owner)
+		for _, region in pairs(owner) do
+			if type(region) == "table" and type(region.GetText) == "function" then
+				local text = region:GetText()
+				if issecretvalue(text) then
+					hidden = hidden + 1
+				elseif type(text) == "string" and text ~= "" then
+					text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("^%s*(.-)%s*$")
+					local first, last = text:match("^(%S+)%s+(%S+)$")
+					if first == firstName and not text:find("[\r\n|/;]") then return first .. " " .. last end
+					seen[#seen + 1] = text
+				end
+			end
+		end
+	end
 	local frame = plate and plate.UnitFrame
-	local region = frame and frame.name
-	if not region or type(region.GetText) ~= "function" then return nil end
-	local text = safe(region:GetText())
-	if type(text) ~= "string" or type(firstName) ~= "string" then return nil end
-	text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):match("^%s*(.-)%s*$")
-	local first, last = text:match("^(%S+)%s+(%S+)$")
-	if first ~= firstName or text:find("[\r\n|/;]") then return nil end
-	return first .. " " .. last
+	local found = (frame and look(frame)) or (plate and look(plate))
+	if found then return found end
+	if hidden > 0 and #seen == 0 then return nil, "the plate's text is hidden (" .. hidden .. " field(s))" end
+	if #seen == 0 then return nil, "the plate has no readable text" end
+	return nil, "no plate text reads '" .. firstName .. " <one word>' (saw: " .. table.concat(seen, " | ", 1, math.min(#seen, 4)) .. ")"
 end
 
 -- Build a candidate for `unit`, or nil + the reason it was rejected.
@@ -64,8 +81,9 @@ local function describe(unit, tier, plate)
 	local name = safe(UnitName(unit))
 	local fullName
 	if plate then
-		fullName = plateFullName(plate, name)
-		if not fullName then return nil, "full name not readable from the nameplate" end
+		local why
+		fullName, why = plateFullName(plate, name)
+		if not fullName then return nil, "full name not readable from the nameplate: " .. why end
 	end
 	return {
 		unit = unit, tier = tier, guid = guid,

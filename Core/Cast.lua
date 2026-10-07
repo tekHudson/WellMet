@@ -49,12 +49,16 @@ local function names(caster)
 	local list = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
-		local used = caster.mode ~= "stack"
+		local used = false
 		for _, sectionKey in ipairs(ns.SECTIONS) do
 			local section = WM.db[sectionKey]
-			if section.enabled then
+			if section.enabled and not (buff.partyOnly and sectionKey == "others") then
 				for _, class in ipairs(ns.TargetClasses) do
-					used = used or ns.StackEnabled(buff, class, section.stack)
+					if caster.mode == "stack" then
+						used = used or ns.StackEnabled(buff, class, section.stack)
+					else
+						used = used or ns.AssignedKey(section, class) == key
+					end
 				end
 			end
 		end

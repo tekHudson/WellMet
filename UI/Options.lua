@@ -41,11 +41,13 @@ end
 
 -- Assign mode (Paladin): the caster's buffs (icon + name in the open list) and "Skip". The closed
 -- dropdown shows just the icon (assignIcon).
-local function assignOptions(caster)
+local function assignOptions(caster, sectionKey)
 	local options = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
-		options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
+		if not (buff.partyOnly and sectionKey == "others") then       -- party-only spells are never offered for strangers
+			options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
+		end
 	end
 	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. " Skip this class" }
 	return options
@@ -82,11 +84,13 @@ local function selfOptions(caster, cat)
 end
 
 -- Stack mode (Mage): one checkbox per buff; the closed dropdown shows the icons of the buffs that are on.
-local function stackOptions(caster)
+local function stackOptions(caster, sectionKey)
 	local options = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
-		options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
+		if not (buff.partyOnly and sectionKey == "others") then
+			options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
+		end
 	end
 	return options
 end
@@ -226,7 +230,7 @@ local function buildClassTable(panel, sectionKey, y)
 		local name = "WellMet" .. sectionKey:sub(1, 1):upper() .. sectionKey:sub(2) .. "Class" .. class
 		local dd
 		if caster.mode == "stack" then
-			dd = makeChecklist(panel, name, 110, 150, y + 2, function() return stackOptions(caster) end,
+			dd = makeChecklist(panel, name, 110, 150, y + 2, function() return stackOptions(caster, sectionKey) end,
 				function(key) return ns.StackEnabled(caster.buffs[key], class, cfg.stack) end,
 				function(key)
 					local buff = caster.buffs[key]
@@ -242,7 +246,7 @@ local function buildClassTable(panel, sectionKey, y)
 					return table.concat(parts)
 				end)
 		else
-			dd = makeDropdown(panel, name, 70, 150, y + 2, function() return assignOptions(caster) end,
+			dd = makeDropdown(panel, name, 70, 150, y + 2, function() return assignOptions(caster, sectionKey) end,
 				function() return ns.AssignedKey(cfg, class) end,
 				function(v) cfg.assign[class] = v end,
 				function(value) return assignIcon(caster, value) end)
@@ -293,7 +297,7 @@ local function buildSelfPanel(caster, subtitle)
 		label:SetText(caster.mode == "stack" and "Buffs" or "Blessing")
 		local dd
 		if caster.mode == "stack" then
-			dd = makeChecklist(panel, "WellMetSelfOwn", 110, 170, y + 2, function() return stackOptions(caster) end,
+			dd = makeChecklist(panel, "WellMetSelfOwn", 110, 170, y + 2, function() return stackOptions(caster, "self") end,
 				function(key) return ns.StackEnabled(caster.buffs[key], class, cfg.stack) end,
 				function(key)
 					local buff = caster.buffs[key]
@@ -309,7 +313,7 @@ local function buildSelfPanel(caster, subtitle)
 					return table.concat(parts)
 				end)
 		else
-			dd = makeDropdown(panel, "WellMetSelfOwn", 70, 170, y + 2, function() return assignOptions(caster) end,
+			dd = makeDropdown(panel, "WellMetSelfOwn", 70, 170, y + 2, function() return assignOptions(caster, "self") end,
 				function() return ns.AssignedKey(cfg, class) end,
 				function(v) cfg.assign[class] = v end,
 				function(value) return assignIcon(caster, value) end)

@@ -111,6 +111,7 @@ function Select.Pick(cands, ctx)
 
 	-- Why this (person, buff) pair can't be cast right now, or nil (+ the distance when it can).
 	local function whyNot(cand, buff, cfg)
+		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
 		if not known(buff) then return buff.name .. " is not learned" end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
 		if blocked then return string.format("tried recently (%.0fs left)", left) end
