@@ -9,6 +9,8 @@ local WM = ns.WM
 -- turn it on.
 --   assign: Paladin: target class -> buff key ("NONE" skips); falls back to ns.DefaultAssign
 --   stack:  Mage / Druid: buff key -> { target class -> true/false }; falls back to the buff's defaultClasses
+--   assign2: (others only, Paladin) the SECONDARY blessing per target class, cast when a stranger already has the primary
+--            from someone else; "NONE" / missing = no fallback
 --   choice: (self only) own-buff category key -> buff key | "AUTO" | "NONE"; falls back to the category's default
 -- For the Self section the "target class" is your own class (the buff you cast on yourself).
 ns.SECTIONS = { "self", "party", "others" }
@@ -21,7 +23,7 @@ local DEFAULTS = {
 	debug        = false,      -- record the /wellmet log and show press-time chat messages
 	self   = { enabled = true,  choice = {}, assign = {}, stack = {} },
 	party  = { enabled = true,  radius = 0,  assign = {}, stack = {} },    -- radius 0 = the buff's own cast range, else 10 or 28 yards
-	others = { enabled = false, radius = 0,  assign = {}, stack = {} },
+	others = { enabled = false, radius = 0,  assign = {}, assign2 = {}, stack = {} },    -- assign2: Paladin's fallback blessing per class, strangers only
 }
 
 local function applyDefaults(target, defaults)

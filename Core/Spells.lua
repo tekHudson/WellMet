@@ -73,6 +73,30 @@ function ns.Lacks(unit, buff)
 	return true
 end
 
+-- What is on `unit` for this buff (the buff itself or any `alt`, e.g. the Greater version)?
+--   "mine"   one of them was cast by you        (aura.sourceUnit is you; Blizzard's own AuraUtil asks the same)
+--   "other"  there, but cast by someone else (or the caster isn't known)
+--   "absent" not there
+--   nil      can't tell right now (auras hidden)
+function ns.AuraState(unit, buff)
+	local names = { buff.name }
+	for _, alt in ipairs(buff.alt or {}) do names[#names + 1] = alt end
+	local found
+	for _, name in ipairs(names) do
+		local aura = C_UnitAuras.GetAuraDataBySpellName(unit, name, "HELPFUL")
+		if aura then
+			if issecrettable(aura) then return nil end
+			local source = aura.sourceUnit
+			if issecretvalue(source) then return nil end
+			if source ~= nil and UnitIsUnit("player", source) then return "mine" end
+			found = "other"
+		end
+	end
+	if found then return found end
+	if C_Secrets.ShouldAurasBeSecret() then return nil end
+	return "absent"
+end
+
 -- Is `unit` within cast range of the buff? true / false / nil (unknown or invalid).
 function ns.InRange(buff, unit)
 	return C_Spell.IsSpellInRange(buff.name, unit)
@@ -97,5 +121,6 @@ ns.Probe = {
 	known    = ns.IsKnown,
 	inRange  = ns.InRange,
 	lacks    = ns.Lacks,
+	state    = ns.AuraState,
 	distance = ns.Distance,
 }

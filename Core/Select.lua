@@ -69,6 +69,16 @@ function Select.BuffsFor(caster, class, cfg)
 	return { buff }
 end
 
+-- The SECONDARY blessing for a stranger of this class (Paladin, Others section only), or nil.
+-- Cast when the stranger already wears the primary from someone else. Ignored if it is the primary itself.
+function Select.SecondaryFor(caster, class, cfg, primary)
+	local key = cfg.assign2 and cfg.assign2[class]
+	if not key or key == "NONE" then return nil end
+	local buff = caster.buffs[key]
+	if not buff or buff == primary or buff.selfOnly then return nil end
+	return buff
+end
+
 -- The caster's own buff for one category (an aura, an armor), or nil (+ a reason when it can't be chosen).
 --   choice "NONE": nothing. "AUTO": the first spell in category.auto that is learned.
 function Select.SelfBuff(caster, cat, cfg, isKnown)
@@ -110,7 +120,7 @@ function Select.Pick(cands, ctx)
 	end
 
 	-- Why this (person, buff) pair can't be cast right now, or nil (+ the distance when it can).
-	local function whyNot(cand, buff, cfg)
+	local function whyNot(cand, buff, cfg, skipAura)
 		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
 		if not known(buff) then return buff.name .. " is not learned" end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
@@ -124,6 +134,7 @@ function Select.Pick(cands, ctx)
 		if radius > 0 and (not dist or dist > radius) then
 			return "outside the " .. radius .. " yd radius"
 		end
+		if skipAura then return nil, dist end
 		local lacks = probe.lacks(cand.unit, buff)
 		if lacks == false then return "already has " .. buff.name end
 		if lacks == nil then return "aura info unavailable right now" end
@@ -137,6 +148,29 @@ function Select.Pick(cands, ctx)
 		else
 			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge }
 		end
+	end
+
+	-- Primary + secondary blessing for a stranger. A Paladin has only ONE blessing on a target at a time, so:
+	--   one of yours already there        -> nothing to do (a second cast would replace it)
+	--   no primary on them                -> the primary
+	--   primary there from someone else   -> the secondary, if they don't have it either
+	local function considerPair(cand, primary, secondary, cfg)
+		local sP, sS = probe.state(cand.unit, primary), probe.state(cand.unit, secondary)
+		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
+		if sP == nil or sS == nil then return skip(primary, "aura info unavailable right now") end
+		if sP == "mine" then return skip(primary, "already has your " .. primary.name) end
+		if sS == "mine" then return skip(secondary, "already has your " .. secondary.name) end
+		local chosen, note
+		if sP == "absent" then
+			chosen = primary
+		elseif sS == "absent" then
+			chosen, note = secondary, primary.name .. " is on them from someone else, so " .. secondary.name .. " instead"
+		else
+			return skip(primary, "already has " .. primary.name .. " and " .. secondary.name .. " (from others)")
+		end
+		local reason, dist = whyNot(cand, chosen, cfg, true)
+		if reason then return skip(chosen, reason) end
+		eligible[#eligible + 1] = { cand = cand, buff = chosen, dist = dist or math.huge, note = note }
 	end
 
 	local function consider(cand)
@@ -160,6 +194,10 @@ function Select.Pick(cands, ctx)
 		if not buffs then
 			skipped[#skipped + 1] = { cand = cand, reason = why }
 			return
+		end
+		if cand.tier == 2 and ctx.caster.mode == "assign" then
+			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])
+			if secondary then return considerPair(cand, buffs[1], secondary, cfg) end
 		end
 		for _, buff in ipairs(buffs) do add(cand, buff, cfg) end
 	end

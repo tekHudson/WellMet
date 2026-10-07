@@ -41,7 +41,7 @@ end
 
 -- Assign mode (Paladin): the caster's buffs (icon + name in the open list) and "Skip". The closed
 -- dropdown shows just the icon (assignIcon).
-local function assignOptions(caster, sectionKey)
+local function assignOptions(caster, sectionKey, secondary)
 	local options = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
@@ -49,7 +49,7 @@ local function assignOptions(caster, sectionKey)
 			options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
 		end
 	end
-	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. " Skip this class" }
+	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. (secondary and " No fallback" or " Skip this class") }
 	return options
 end
 
@@ -223,6 +223,16 @@ local function buildClassTable(panel, sectionKey, y)
 	local cfg = WM.db[sectionKey]
 	local classes = { unpack(ns.TargetClasses) }
 	table.sort(classes, function(a, b) return className(a):lower() < className(b):lower() end)
+	-- Strangers get a fallback: a Paladin has one blessing per target, so when the primary is already on someone
+	-- from another Paladin, the secondary is cast instead. (In a group people agree who casts what.)
+	local withSecondary = caster.mode == "assign" and sectionKey == "others"
+	if withSecondary then
+		local first = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		first:SetPoint("TOPLEFT", 150, y + 4); first:SetText("Primary")
+		local second = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+		second:SetPoint("TOPLEFT", 240, y + 4); second:SetText("Secondary (if they have the primary)")
+		y = y - 12
+	end
 	for _, class in ipairs(classes) do
 		local text = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
 		text:SetPoint("TOPLEFT", 24, y - 4)
@@ -252,6 +262,13 @@ local function buildClassTable(panel, sectionKey, y)
 				function(value) return assignIcon(caster, value) end)
 		end
 		panel.refreshers[#panel.refreshers + 1] = dd.refresh
+		if withSecondary then
+			local dd2 = makeDropdown(panel, name .. "Second", 70, 240, y + 2, function() return assignOptions(caster, sectionKey, true) end,
+				function() return cfg.assign2[class] or "NONE" end,
+				function(v) cfg.assign2[class] = v end,
+				function(value) return assignIcon(caster, value) end)
+			panel.refreshers[#panel.refreshers + 1] = dd2.refresh
+		end
 		y = y - 30
 	end
 	return y

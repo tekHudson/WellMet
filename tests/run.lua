@@ -159,7 +159,12 @@ local function newEnv(W)
 	g.C_UnitAuras = {
 		GetAuraDataBySpellName = function(unit, name)
 			if W.restricted then return nil end
-			local x = U(unit); if x and x.auras[name] then return { name = name } end
+			local x = U(unit); local a = x and x.auras[name]
+			if not a then return nil end
+			if a == "mine" then return { name = name, sourceUnit = "player" } end
+			if a == "other" then return { name = name, sourceUnit = "party2" } end
+			if a == "secret" then return { name = name, sourceUnit = SECRET } end
+			return { name = name }          -- a plain true: there, caster unknown
 		end,
 	}
 	g.C_NamePlate = { GetNamePlates = function() local t = {} for i, tok in ipairs(W.plates) do local u = W.units[tok]
@@ -238,7 +243,9 @@ local function mkSettings(over)
 	local function section(enabled)
 		return { enabled = enabled, radius = over.radius or 0, assign = over.assign or {}, stack = over.stack or {}, choice = over.selfChoice or {} }
 	end
-	return { self = section(over.includeSelf ~= false), party = section(true), others = section(over.strangers ~= false) }
+	local others = section(over.strangers ~= false)
+	others.assign2 = over.assign2 or {}
+	return { self = section(over.includeSelf ~= false), party = section(true), others = others }
 end
 
 local function printed(W, needle)
@@ -1162,6 +1169,122 @@ do
 	end
 	check("Mage Party / Raid table offers Intellect, Dampen, Amplify", table.concat(checks(Em.g.WellMetPartyClassPRIEST), ",") == "INTELLECT,DAMPEN,AMPLIFY")
 	check("Mage Others table offers only Intellect (Dampen and Amplify are party-only)", table.concat(checks(Em.g.WellMetOthersClassPRIEST), ",") == "INTELLECT")
+end
+
+----------------------------------------------------------------------
+print("== Paladin secondary blessing (Others only)")
+do
+	local WM, ns, E, W = load()
+	local function learn(list) for name, id in pairs(list) do W.spells[name] = id; W.known[id] = true end end
+	learn({ ["Blessing of Kings"] = 20217 })
+	local P = WM.caster.buffs
+	local KINGS, MIGHT = P.KINGS, P.MIGHT
+
+	-- a probe whose aura answers come from a table: states[buffKey] = "absent" | "mine" | "other" | nil (hidden)
+	local function probeOf(states)
+		return {
+			known = function() return true end, inRange = function() return true end, distance = function() return nil end,
+			state = function(_, buff) return states[buff.key] end,
+			lacks = function(_, buff) local st = states[buff.key]; if st == nil then return nil end; return st == "absent" end,
+		}
+	end
+	local function stranger(class) return { unit = "nameplate1", key = "G-x", name = "Stranger", tier = 2, class = class or "WARRIOR", order = 1 } end
+	local function run(states, over, cand)
+		local settings = mkSettings(over or { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" } })
+		settings.others.assign = { WARRIOR = "KINGS" }
+		return ns.Select.Pick({ cand or stranger() }, { now = 100, settings = settings, caster = WM.caster, probe = probeOf(states) })
+	end
+	local function reason(skipped) return skipped[1] and skipped[1].reason or "" end
+
+	local best = run({ KINGS = "absent", MIGHT = "absent" })
+	check("neither on them: the primary (Kings) is cast", best and best.buff.key == "KINGS" and best.note == nil)
+	best = run({ KINGS = "other", MIGHT = "absent" })
+	check("Kings from someone else, no Might: the secondary (Might) is cast, with a note saying why",
+		best and best.buff.key == "MIGHT" and best.note and best.note:find("Blessing of Kings is on them from someone else", 1, true) ~= nil)
+	local b3, sk3 = run({ KINGS = "other", MIGHT = "other" })
+	check("both on them from others: nothing to do", b3 == nil and reason(sk3):find("already has Blessing of Kings and Blessing of Might", 1, true) ~= nil)
+	local b4, sk4 = run({ KINGS = "mine", MIGHT = "absent" })
+	check("your own Kings is already there: skipped (a second cast would replace it)", b4 == nil and reason(sk4):find("already has your Blessing of Kings", 1, true) ~= nil)
+	local b5, sk5 = run({ KINGS = "other", MIGHT = "mine" })
+	check("your own Might is already there: skipped", b5 == nil and reason(sk5):find("already has your Blessing of Might", 1, true) ~= nil)
+	local b6, sk6 = run({ KINGS = "absent", MIGHT = "mine" })
+	check("your Might there and Kings missing: Kings does NOT replace your Might", b6 == nil and reason(sk6):find("already has your Blessing of Might", 1, true) ~= nil)
+	local b7, sk7 = run({ KINGS = nil, MIGHT = "absent" })
+	check("aura information hidden: skipped, not guessed", b7 == nil and reason(sk7):find("aura info unavailable", 1, true) ~= nil)
+
+	-- no usable secondary: the old single-blessing behavior
+	local b8, sk8 = run({ KINGS = "other" }, { assign = { WARRIOR = "KINGS" }, assign2 = {} })
+	check("no secondary set: Kings from someone else just means 'already has Kings'", b8 == nil and reason(sk8):find("already has Blessing of Kings", 1, true) ~= nil)
+	local b9 = run({ KINGS = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "NONE" } })
+	check("secondary 'No fallback' behaves the same as none", b9 and b9.buff.key == "KINGS")
+	local b10, sk10 = run({ KINGS = "other", MIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "KINGS" } })
+	check("a secondary equal to the primary is ignored", b10 == nil and reason(sk10):find("already has Blessing of Kings", 1, true) ~= nil)
+
+	-- scope: strangers only
+	local member = { unit = "party1", key = "G-m", name = "Member", tier = 1, class = "WARRIOR", order = 1 }
+	local bm = run({ KINGS = "other", MIGHT = "absent" }, nil, member)
+	check("a group member never uses the secondary (people in a group agree who casts what)", bm == nil)
+
+	-- "tried recently" on the chosen blessing blocks the person; it does not escalate to the other blessing
+	ns.Select.Mark("G-x", "Blessing of Kings", 8, 100)
+	local b11, sk11 = run({ KINGS = "absent", MIGHT = "absent" })
+	check("the primary was just tried: skipped, not switched to the secondary", b11 == nil and reason(sk11):find("tried recently", 1, true) ~= nil)
+	ns.Select.Reset()
+
+	-- a party-only blessing as the secondary is refused for a stranger
+	local settings = mkSettings({ assign2 = { WARRIOR = "SALVATION" } }); settings.others.assign = { WARRIOR = "KINGS" }
+	local b12, sk12 = ns.Select.Pick({ stranger() }, { now = 100, settings = settings, caster = WM.caster, probe = probeOf({ KINGS = "other", SALVATION = "absent" }) })
+	check("Salvation as a stranger's secondary is refused (party only)", b12 == nil and reason(sk12):find("only works on party and raid members", 1, true) ~= nil)
+
+	-- AuraState: who cast what is on someone
+	addUnit(W, "nameplate1", { class = "WARRIOR", name = "Stranger", guid = "G-x", auras = {} })
+	W.units.nameplate1.auras = { ["Blessing of Kings"] = "mine" }
+	check("AuraState: your own Kings is 'mine'", ns.AuraState("nameplate1", KINGS) == "mine")
+	W.units.nameplate1.auras = { ["Blessing of Kings"] = "other" }
+	check("AuraState: someone else's Kings is 'other'", ns.AuraState("nameplate1", KINGS) == "other")
+	W.units.nameplate1.auras = { ["Blessing of Kings"] = true }
+	check("AuraState: an aura with no known caster counts as 'other'", ns.AuraState("nameplate1", KINGS) == "other")
+	W.units.nameplate1.auras = { ["Greater Blessing of Kings"] = "mine" }
+	check("AuraState: your own GREATER Kings counts as 'mine' too", ns.AuraState("nameplate1", KINGS) == "mine")
+	W.units.nameplate1.auras = {}
+	check("AuraState: nothing there is 'absent'", ns.AuraState("nameplate1", KINGS) == "absent")
+	W.units.nameplate1.auras = { ["Blessing of Kings"] = "secret" }
+	check("AuraState: a hidden caster is unreadable (nil), not guessed", ns.AuraState("nameplate1", KINGS) == nil)
+	W.restricted = true
+	check("AuraState: auras hidden by the game: nil", ns.AuraState("nameplate1", KINGS) == nil)
+	W.restricted = nil
+
+	-- the whole key press: a stranger Warrior with someone else's Kings gets Might from the secondary
+	learn({ ["Blessing of Might"] = 19834 })
+	WM.db.others.assign.WARRIOR = "KINGS"; WM.db.others.assign2.WARRIOR = "MIGHT"
+	W.groupSize = 0; W.units.party1 = nil
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W.spells["Devotion Aura"] = 465; W.known[465] = true
+	W.units.nameplate1.auras = { ["Blessing of Kings"] = "other" }
+	W.plates = { "nameplate1" }
+	local btn = press(E)
+	check("key press: Kings is on the stranger from someone else, so the macro casts Blessing of Might",
+		btn.attrs.type == "macro" and btn.attrs.macrotext:find("/cast [@target,exists,help,nodead] Blessing of Might", 1, true) ~= nil)
+	check("...and the debug log says why", WM:BuildReport():find("on them from someone else, so Blessing of Might instead", 1, true) ~= nil)
+
+	-- settings: only the Others page has a secondary dropdown
+	check("Others has a Secondary dropdown per class; Party / Raid and Self do not",
+		E.g.WellMetOthersClassWARRIORSecond ~= nil and E.g.WellMetPartyClassWARRIORSecond == nil and E.g.WellMetSelfOwnSecond == nil)
+	local function items(dd)
+		local list = {}
+		dd.menuGen(dd, { CreateRadio = function(_, label, isSel, _, data) list[#list + 1] = { data = data, label = label, on = isSel() }; return { SetTooltip = function() end } end })
+		return list
+	end
+	local second = items(E.g.WellMetOthersClassWARRIORSecond)
+	local seq = {}
+	for _, it in ipairs(second) do seq[#seq + 1] = it.data end
+	check("the Secondary list: the blessings you can give a stranger (no Salvation) and 'No fallback'",
+		table.concat(seq, ",") == "MIGHT,WISDOM,KINGS,LIGHT,NONE" and second[5].label:find("No fallback", 1, true) ~= nil)
+	check("...and it shows the saved secondary (Might) as selected", second[1].on and not second[5].on)
+	E.g.WellMetOthersClassWARRIORSecond.menuGen(E.g.WellMetOthersClassWARRIORSecond, { CreateRadio = function(_, _, _, set, data) if data == "WISDOM" then set() end; return { SetTooltip = function() end } end })
+	check("picking a secondary saves it for Others only", WM.db.others.assign2.WARRIOR == "WISDOM" and WM.db.party.assign2 == nil)
+	local fresh = load({ others = false })
+	check("a fresh profile has no secondaries, and only Others has the table", next(fresh.db.others.assign2) == nil and fresh.db.party.assign2 == nil and fresh.db.self.assign2 == nil)
 end
 
 ----------------------------------------------------------------------

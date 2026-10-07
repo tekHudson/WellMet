@@ -136,7 +136,7 @@ function WM:OnPress(b, fromMacro)
 	end
 	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now }
 	WM:Log("press: armed", buff.name, "on", cand.name, "(" .. cand.unit .. ",", "tier " .. cand.tier .. ",",
-		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")")
+		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")" .. (best.note and (" - " .. best.note) or ""))
 end
 
 -- A bound key sends down then up; `/click WellMetCast` sends only up. The secure handler

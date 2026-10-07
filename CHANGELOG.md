@@ -12,6 +12,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   Sacrifice last only 10 to 30 seconds and are left out. Forever has no Sanctuary.
 - Salvation, Dampen Magic and Amplify Magic say "party member", so they are offered for your group (and for yourself)
   and never for strangers: they are left out of the Others settings, and refused if one is ever set for a stranger.
+- Paladin, Others section: a **secondary blessing** per target class. A Paladin can have only one blessing on a target,
+  so when a stranger already wears your primary (say Kings) from another Paladin, the secondary (say Might) is cast
+  instead. If one of your own blessings is already on them nothing is cast, so it never replaces your own. It uses the
+  game's "who cast this" information; the debug log says when the secondary was chosen. Self and Party / Raid keep a
+  single blessing, since in a group people can agree who casts what.
 - The "Nobody nearby needs ..." message names only the buffs that are assigned somewhere.
 
 ### Fixed
