@@ -151,7 +151,10 @@ local function newEnv(W)
 		GetSpellName = function(id) for n, i in pairs(W.spells) do if i == id then return n end end end,
 		IsSpellInRange = function(name, unit) local x = U(unit); if not x then return nil end; return x.inRange end,
 		GetSpellCooldown = function(name) return W.cooldowns[name] or { startTime = 0, duration = 0, isEnabled = true, modRate = 1 } end,
+		IsSpellUsable = function() return true end,
 	}
+	g.SpellIsTargeting = function() return false end
+	g.UnitCastingInfo = function() return nil end
 	g.C_SpellBook = { IsSpellKnown = function(id) return W.known[id] or false end }
 	g.C_Secrets = {
 		ShouldAurasBeSecret = function() return W.restricted end,
@@ -1359,6 +1362,92 @@ do
 	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
 	check("/wellmet forget also forgets the line-of-sight history (back to 20 s)", blockedFor(19) and not blockedFor(21))
 	check("the log names the skip length", WM:BuildReport():find("skipping Stranger for 20s", 1, true) ~= nil and WM:BuildReport():find("skipping Stranger for 60s", 1, true) ~= nil)
+end
+
+----------------------------------------------------------------------
+print("== Debug button, build label, one-shot arming")
+do
+	local WM, ns, E, W = load()
+	-- main page: a Debug button showing the state, and a plain "Open log"
+	local dbg, logb = E.g.WellMetDebugButton, E.g.WellMetLogButton
+	WM.refreshOptions()
+	check("the main page has a Debug button that shows the state: 'Debug: On' while debug is on", dbg ~= nil and dbg.text == "Debug: On")
+	dbg.scripts.OnClick(dbg)
+	check("clicking it turns debug off and the button says 'Debug: Off'", WM.db.debug == false and dbg.text == "Debug: Off")
+	dbg.scripts.OnClick(dbg)
+	check("clicking again turns it back on ('Debug: On')", WM.db.debug == true and dbg.text == "Debug: On")
+	WM.db.debug = false; WM.refreshOptions()
+	check("the button follows the saved state when the page is shown", dbg.text == "Debug: Off")
+	WM.db.debug = true; WM.refreshOptions()
+	check("the log button is just 'Open log' (no '/wellmet log' in its label)",
+		logb ~= nil and logb.text == "Open log" and not readFile("UI/Options.lua"):find('"Open log (/wellmet log)"', 1, true))
+	local opened = false
+	local realShow = WM.ShowLog
+	WM.ShowLog = function() opened = true end
+	logb.scripts.OnClick(logb)
+	WM.ShowLog = realShow
+	check("...and it opens the log", opened)
+	E.g.SlashCmdList.WELLMET("debug")
+	check("/wellmet debug uses the same toggle", WM.db.debug == false)
+	E.g.SlashCmdList.WELLMET("debug")
+
+	-- the report says which build is running
+	check("the log overview names the build", WM:BuildReport():find("(build " .. ns.BUILD .. ")", 1, true) ~= nil and ns.BUILD ~= nil and ns.BUILD ~= "")
+
+	-- one-shot arming: the button acts on the press that armed it, nothing else
+	W.groupSize = 0; W.units.party1 = nil; W.plates = {}
+	W.spells["Devotion Aura"] = 465; W.known[465] = true
+	W.units.player.auras = {}                                  -- lacks the aura: a self cast gets armed
+	local b = E.g.WellMetCast
+	local function armed() return b.attrs.type or b.attrs.spell or b.attrs.unit or b.attrs.macrotext end
+	b.scripts.PreClick(b, "LeftButton", true)
+	check("a press arms the button (spell cast on you)", b.attrs.type == "spell" and b.attrs.spell == "Devotion Aura")
+	b.scripts.PostClick(b, "LeftButton", true)
+	check("after the click the button is disarmed (type, spell, unit, macro all gone)", armed() == nil)
+	b.scripts.PreClick(b, "LeftButton", false)
+	b.scripts.PostClick(b, "LeftButton", false)
+	check("the key's release does nothing and arms nothing", armed() == nil)
+
+	-- a stranger (macro) press is disarmed the same way
+	addUnit(W, "nameplate1", { class = "PRIEST", name = "Stranger", guid = "G-s", interact = "mid", auras = {} })
+	W.plates = { "nameplate1" }
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W.now = W.now + 100; ns.Select.Reset()
+	b.scripts.PreClick(b, "LeftButton", true)
+	check("a stranger press arms the targeting macro", b.attrs.type == "macro" and b.attrs.macrotext ~= nil)
+	b.scripts.PostClick(b, "LeftButton", true)
+	check("...and it is disarmed after the click too", armed() == nil)
+
+	-- the case that matters: a press in combat can no longer repeat the last cast
+	W.now = W.now + 100; ns.Select.Reset()
+	b.scripts.PreClick(b, "LeftButton", true); b.scripts.PostClick(b, "LeftButton", true)
+	W.combat = true; W.now = W.now + 100
+	b.scripts.PreClick(b, "LeftButton", true)
+	check("in combat: the press is refused and the button has nothing armed to repeat", armed() == nil and printed(W, "combat"))
+	b.scripts.PostClick(b, "LeftButton", true)
+	W.combat = false
+
+	-- in combat the button's attributes can't be changed, so PostClick must not try
+	W.now = W.now + 100; ns.Select.Reset()
+	b.scripts.PreClick(b, "LeftButton", true)                  -- armed out of combat
+	W.combat = true
+	local sets, orig = 0, b.SetAttribute
+	b.SetAttribute = function(self, k, v) sets = sets + 1; orig(self, k, v) end
+	b.scripts.PostClick(b, "LeftButton", true)
+	b.SetAttribute = orig
+	check("PostClick does not touch the attributes during combat", sets == 0)
+	W.combat = false
+	b.scripts.PostClick(b, "LeftButton", false)
+
+	-- a /click macro (an up click with no down before it) is disarmed too
+	b.scripts.PreClick(b, "LeftButton", false)                 -- the release of the key press above, so no key is held now
+	W.now = W.now + 100; ns.Select.Reset()
+	W.units.nameplate1 = nil; W.plates = {}
+	W.units.player.auras = {}
+	b.scripts.PreClick(b, "LeftButton", false)
+	check("a /click macro press arms the self cast", b.attrs.type == "spell")
+	b.scripts.PostClick(b, "LeftButton", false)
+	check("...and is disarmed afterwards", armed() == nil)
 end
 
 ----------------------------------------------------------------------

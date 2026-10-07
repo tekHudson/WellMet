@@ -25,6 +25,10 @@ ns.ADDON = ADDON
 
 WM.version = C_AddOns.GetAddOnMetadata(ADDON, "Version") or "0"
 
+-- Shown in the /wellmet log overview so a stale copy is obvious. On `development` it is bumped with every commit
+-- ("dev.N"); the release / merge to `main` sets it to "release".
+ns.BUILD = "dev.4"
+
 ----------------------------------------------------------------------
 -- Debug log: a ring buffer that is filled ONLY while the debug setting is on (written on
 -- key presses, picks and cast results). `/wellmet log` shows it. WM:Note is the same gate
@@ -62,6 +66,13 @@ end
 local PREFIX = "|cff66ddffWellMet:|r "
 function WM:Print(...)
 	print(PREFIX .. strjoin(" ", tostringall(...)))
+end
+
+-- Turn debug on / off (the slash command and the settings button both use this). Returns the new state.
+function WM:ToggleDebug()
+	WM.db.debug = not WM.db.debug
+	WM:Log("debug turned on")          -- only recorded when it is on
+	return WM.db.debug
 end
 
 -- Chat message that only shows while debug is on (why a press did nothing, "Buffed ...").
@@ -142,9 +153,8 @@ function WM:SetupSlash()
 				WM:ShowLog()
 			end
 		elseif command == "debug" then
-			WM.db.debug = not WM.db.debug
-			WM:Log("debug turned on")
-			WM:Print("debug: " .. (WM.db.debug and "ON (recording the log, showing press messages)" or "OFF") .. "  (/wellmet log opens the copyable log)")
+			local on = WM:ToggleDebug()
+			WM:Print("debug: " .. (on and "ON (recording the log, showing press messages)" or "OFF") .. "  (/wellmet log opens the copyable log)")
 		elseif command == "forget" then
 			ns.Select.Reset(); ns.ForgetFailures(); WM:Print("forgot who was recently tried")
 		elseif command == "self" or command == "party" or command == "raid" or command == "others" then

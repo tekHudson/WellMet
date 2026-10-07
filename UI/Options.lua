@@ -418,11 +418,19 @@ local function buildMainPanel(subs)
 	check("Allow casting while mounted (dismounts you)", function() return WM.db.allowMounted end, function(v) WM.db.allowMounted = v and true or false end)
 	check("Show the minimap button", function() return not WM.db.minimap.hide end,
 		function(v) WM.db.minimap.hide = not v; if WM.minimap then WM.minimap:SetShown(v) end end)
-	check("Debug: record the log and show why a press did nothing", function() return WM.db.debug end, function(v) WM.db.debug = v and true or false end)
 	y = y - 6
-	makeButton(panel, "Open log (/wellmet log)", 200, 24, y, function() WM:ShowLog() end)
-	makeButton(panel, "Create macro", 130, 240, y, function() WM:CreateMacro() end, "WellMetMacroButton")
+	-- Debug records the log and shows why a press did nothing. The button shows the state and flips it.
+	local debugButton
+	debugButton = makeButton(panel, "", 110, 24, y, function()
+		WM:ToggleDebug()
+		debugButton:SetText(WM.db.debug and "Debug: On" or "Debug: Off")
+	end, "WellMetDebugButton")
+	panel.refreshers[#panel.refreshers + 1] = function() debugButton:SetText(WM.db.debug and "Debug: On" or "Debug: Off") end
+	makeButton(panel, "Open log", 110, 142, y, function() WM:ShowLog() end, "WellMetLogButton")
+	makeButton(panel, "Create macro", 130, 274, y, function() WM:CreateMacro() end, "WellMetMacroButton")
 	y = y - 30
+	makeText(panel, "Debug records a log you can copy and shows why a press did nothing.", 24, y)
+	y = y - 20
 	makeText(panel, "Create macro puts a /click WellMetCast macro on your cursor: click an action bar slot. It buffs you and your group, "
 		.. "not strangers (the game won't run that from inside a macro), so strangers need the key.", 24, y)
 	return panel

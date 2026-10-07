@@ -187,6 +187,9 @@ button:SetScript("PostClick", function(self, mouseButton, down)
 			"inRange=" .. ns.SafeStr(C_Spell.IsSpellInRange(spell, unit)), "usable=" .. ns.SafeStr((C_Spell.IsSpellUsable(spell))),
 			"targeting=" .. ns.SafeStr(SpellIsTargeting()), "gcd=" .. ns.SafeStr((C_Spell.GetSpellCooldown(spell) or {}).duration))
 	end
+	-- The action has run by now. Disarm, so a later press in combat (when attributes can't be changed, and
+	-- OnPress refuses) cannot repeat a stale cast on a stale unit.
+	if not InCombatLockdown() then clearArm(self) end
 end)
 
 ----------------------------------------------------------------------

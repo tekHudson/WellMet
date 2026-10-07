@@ -17,9 +17,13 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   instead. If one of your own blessings is already on them nothing is cast, so it never replaces your own. It uses the
   game's "who cast this" information; the debug log says when the secondary was chosen. Self and Party / Raid keep a
   single blessing, since in a group people can agree who casts what.
+- Main settings page: a **Debug: On / Off** button that shows the state and flips it, next to a plainer **Open log**
+  button. The log overview now names the build, so a stale copy is easy to spot.
 - The "Nobody nearby needs ..." message names only the buffs that are assigned somewhere.
 
 ### Fixed
+- The key button is disarmed after every click, so a press in combat (when the game won't let an addon change the
+  button) can no longer repeat the previous cast on the previous unit.
 - Mashing the key during the global cooldown no longer spams "Spell is not ready yet" or re-targets for nothing: a press
   does nothing until the cooldown is nearly over (a press in the last 0.4 s still goes through, the game queues it). The
   debug log says "press ignored ... is on cooldown".
