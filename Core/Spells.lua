@@ -97,6 +97,16 @@ function ns.AuraState(unit, buff)
 	return "absent"
 end
 
+-- Seconds until `buff` can be cast (the global cooldown counts), 0 when it is ready, nil when the game hides it.
+function ns.CooldownLeft(buff)
+	local cd = C_Spell.GetSpellCooldown(buff.name)
+	if not cd or issecrettable(cd) then return nil end
+	local start, duration = cd.startTime, cd.duration
+	if issecretvalue(start) or issecretvalue(duration) then return nil end
+	if not start or not duration or duration <= 0 then return 0 end
+	return math.max(0, start + duration - GetTime())
+end
+
 -- Is `unit` within cast range of the buff? true / false / nil (unknown or invalid).
 function ns.InRange(buff, unit)
 	return C_Spell.IsSpellInRange(buff.name, unit)

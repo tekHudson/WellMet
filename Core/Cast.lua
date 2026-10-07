@@ -20,7 +20,11 @@ local BUTTON_NAME = "WellMetCast"
 local CLICK_ACTION = "CLICK " .. BUTTON_NAME .. ":LeftButton"
 
 local TRIED_SECONDS    = 8     -- skip someone we just cast on (until the aura shows)
-local FAILED_SECONDS   = 5     -- out of range / line of sight
+local FAILED_SECONDS   = 5     -- out of range: people move
+local LOS_SECONDS      = 20    -- line of sight: someone behind a wall usually stays behind it
+local LOS_REPEAT_SECONDS = 60  -- ...and when the same person fails line of sight again soon after
+local LOS_REPEAT_WINDOW  = 120
+local QUEUE_WINDOW     = 0.4   -- a press this close to the end of the cooldown goes through (the game queues it)
 local STRONGER_SECONDS = 300   -- a stronger buff from someone else is already on them
 local DEBOUNCE         = 0.15
 
@@ -114,6 +118,13 @@ function WM:OnPress(b, fromMacro)
 	end
 
 	local cand, buff = best.cand, best.buff
+	-- Mashing the key during the global cooldown only produces "Spell is not ready yet" and re-targets for nothing,
+	-- so do nothing until the cooldown is nearly over.
+	local wait = ns.CooldownLeft(buff)
+	if wait and wait > QUEUE_WINDOW then
+		WM:Log("press ignored:", buff.name, "is on cooldown", string.format("(%.1fs left)", wait))
+		return
+	end
 	if cand.fullName and fromMacro then
 		-- Strangers are targeted by a secure macro, and the client won't run a macro from inside
 		-- a `/click` macro (a bound key works). Say so instead of silently doing nothing.
@@ -184,10 +195,8 @@ end)
 local function failureKind(message)
 	if message == nil then return nil end
 	if message == _G.SPELL_FAILED_AURA_BOUNCED then return "stronger" end
-	if message == _G.SPELL_FAILED_LINE_OF_SIGHT or message == _G.SPELL_FAILED_OUT_OF_RANGE
-		or message == _G.ERR_OUT_OF_RANGE or message == _G.SPELL_FAILED_VISION_OBSCURED then
-		return "unreachable"
-	end
+	if message == _G.SPELL_FAILED_LINE_OF_SIGHT or message == _G.SPELL_FAILED_VISION_OBSCURED then return "los" end
+	if message == _G.SPELL_FAILED_OUT_OF_RANGE or message == _G.ERR_OUT_OF_RANGE then return "range" end
 	return nil
 end
 ns.FailureKind = failureKind
@@ -216,11 +225,22 @@ local function onSucceeded(_, castGUID)
 	WM.pending = nil
 end
 
+local losFails = {}          -- target key -> time of its last line-of-sight failure
+function ns.ForgetFailures() for k in pairs(losFails) do losFails[k] = nil end end
+
 local function onError(_, message)
 	local p = pendingRecent()
 	local kind = failureKind(message)
 	if not p or not kind then return end
-	local seconds = (kind == "stronger") and STRONGER_SECONDS or FAILED_SECONDS
+	local seconds = FAILED_SECONDS
+	if kind == "stronger" then
+		seconds = STRONGER_SECONDS
+	elseif kind == "los" then
+		local last = losFails[p.key]
+		local now = GetTime()
+		seconds = (last and now - last < LOS_REPEAT_WINDOW) and LOS_REPEAT_SECONDS or LOS_SECONDS
+		losFails[p.key] = now
+	end
 	ns.Select.Mark(p.key, p.spell, seconds)
 	WM:Log("cast failed:", ns.SafeStr(message), "-> skipping", p.name, "for", seconds .. "s")
 	WM.pending = nil

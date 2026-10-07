@@ -20,6 +20,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 - The "Nobody nearby needs ..." message names only the buffs that are assigned somewhere.
 
 ### Fixed
+- Mashing the key during the global cooldown no longer spams "Spell is not ready yet" or re-targets for nothing: a press
+  does nothing until the cooldown is nearly over (a press in the last 0.4 s still goes through, the game queues it). The
+  debug log says "press ignored ... is on cooldown".
+- Someone out of line of sight is skipped for 20 seconds instead of 5, and for 60 seconds if the same person fails line
+  of sight again within two minutes, so one person behind a wall no longer costs a key press every few seconds. Out of
+  range stays at 5 seconds. `/wellmet forget` clears the history.
 - Strangers' full names are found whatever the nameplate's text field is called, and when they can't be read the log
   says why (hidden name, hidden plate text, or what the plate showed instead).
 

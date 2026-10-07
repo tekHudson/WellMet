@@ -23,7 +23,7 @@ local function newWorld()
 		now = 1000, combat = false, mounted = false, flying = false, taxi = false,
 		restricted = false, raid = false, groupSize = 0,
 		cvars = { nameplateShowFriendlyPlayers = "1" },
-		units = {}, plates = {}, known = {}, spells = {}, macros = {},
+		units = {}, plates = {}, known = {}, spells = {}, macros = {}, cooldowns = {},
 		bindings = {},           -- key -> action (pre-existing bindings)
 		overrides = {},          -- key -> action set by addon
 		prints = {}, sentCalls = 0,
@@ -150,6 +150,7 @@ local function newEnv(W)
 		GetSpellInfo = function(name) local id = W.spells[name]; return id and { name = name, spellID = id, iconID = 1000000 + id } or nil end,
 		GetSpellName = function(id) for n, i in pairs(W.spells) do if i == id then return n end end end,
 		IsSpellInRange = function(name, unit) local x = U(unit); if not x then return nil end; return x.inRange end,
+		GetSpellCooldown = function(name) return W.cooldowns[name] or { startTime = 0, duration = 0, isEnabled = true, modRate = 1 } end,
 	}
 	g.C_SpellBook = { IsSpellKnown = function(id) return W.known[id] or false end }
 	g.C_Secrets = {
@@ -1285,6 +1286,79 @@ do
 	check("picking a secondary saves it for Others only", WM.db.others.assign2.WARRIOR == "WISDOM" and WM.db.party.assign2 == nil)
 	local fresh = load({ others = false })
 	check("a fresh profile has no secondaries, and only Others has the table", next(fresh.db.others.assign2) == nil and fresh.db.party.assign2 == nil and fresh.db.self.assign2 == nil)
+end
+
+----------------------------------------------------------------------
+print("== Cooldown guard and line-of-sight skips")
+do
+	local WM, ns, E, W = load()
+	W.groupSize = 0; W.units.party1 = nil
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true }
+	W.spells["Devotion Aura"] = 465; W.known[465] = true
+	addUnit(W, "nameplate1", { class = "PRIEST", name = "Stranger", guid = "G-s", interact = "mid", auras = {} })
+	W.plates = { "nameplate1" }
+	local WIS = "Blessing of Wisdom"
+	local function pressAt(dt) W.now = W.now + (dt or 5); ns.Select.Reset(); return press(E) end
+
+	-- while the global cooldown is running a press does nothing (no re-targeting, no "not ready" error)
+	W.cooldowns[WIS] = { startTime = W.now + 5 - 0.5, duration = 1.5 }          -- 1.0 s left once the press happens
+	local b = pressAt(5)
+	check("on cooldown (1.0 s left): the press arms nothing", b.attrs.type == nil and b.attrs.macrotext == nil)
+	check("...and the debug log says why, with the time left", WM:BuildReport():find("press ignored: Blessing of Wisdom is on cooldown (1.0s left)", 1, true) ~= nil)
+	W.cooldowns[WIS] = { startTime = W.now + 5 - 1.2, duration = 1.5 }          -- 0.3 s left: inside the game's queue window
+	b = pressAt(5)
+	check("0.3 s left (inside the queue window): the press goes through", b.attrs.type == "macro" and b.attrs.macrotext:find("Blessing of Wisdom", 1, true) ~= nil)
+	W.cooldowns[WIS] = { startTime = W.now + 5 - 10, duration = 1.5 }           -- the cooldown ended long ago
+	check("the cooldown finished: the press goes through", pressAt(5).attrs.type == "macro")
+	W.cooldowns[WIS] = nil
+	check("no cooldown at all: the press goes through", pressAt(5).attrs.type == "macro")
+	W.cooldowns[WIS] = { startTime = W.now + 5 - 5, duration = 30 }             -- a real 30 s cooldown, 25 s left
+	b = pressAt(5)
+	check("a long cooldown (25 s left) blocks the press too", b.attrs.type == nil and WM:BuildReport():find("(25.0s left)", 1, true) ~= nil)
+	addUnit(W, "hidden", { secretGuid = true })
+	local SECRET = E.g.UnitGUID("hidden")
+	W.cooldowns[WIS] = { startTime = SECRET, duration = SECRET }
+	check("a cooldown the game hides is not guessed: the press goes through", pressAt(5).attrs.type == "macro")
+	W.cooldowns[WIS] = nil
+	check("the cooldown reader itself: ready = 0, hidden = nil", ns.CooldownLeft(WM.caster.buffs.WISDOM) == 0)
+
+	-- failure kinds
+	check("line of sight and obscured vision are 'los'; both out-of-range messages are 'range'",
+		ns.FailureKind(E.g.SPELL_FAILED_LINE_OF_SIGHT) == "los" and ns.FailureKind(E.g.SPELL_FAILED_VISION_OBSCURED) == "los"
+		and ns.FailureKind(E.g.SPELL_FAILED_OUT_OF_RANGE) == "range" and ns.FailureKind(E.g.ERR_OUT_OF_RANGE) == "range"
+		and ns.FailureKind(E.g.SPELL_FAILED_AURA_BOUNCED) == "stronger" and ns.FailureKind("Spell is not ready yet.") == nil)
+
+	-- skips after a failed cast: the key is "G-s", the spell Wisdom
+	local castFrame = ns.castFrame
+	local function fail(message)
+		WM.pending = { key = "G-s", spell = WIS, unit = "nameplate1", name = "Stranger", at = W.now }
+		castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, message)
+	end
+	local function blockedFor(seconds) return (ns.Select.IsBlocked("G-s", WIS, W.now + seconds)) end
+	ns.Select.Reset(); ns.ForgetFailures()
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("first line-of-sight failure: skipped for 20 s", blockedFor(19) and not blockedFor(21))
+	W.now = W.now + 30; ns.Select.Reset()
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("the same person fails line of sight again soon after: skipped for 60 s", blockedFor(59) and not blockedFor(61))
+	W.now = W.now + 70; ns.Select.Reset()
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("...and stays at 60 s while it keeps failing", blockedFor(59) and not blockedFor(61))
+	W.now = W.now + 300; ns.Select.Reset()
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("a failure long after the last one starts again at 20 s", blockedFor(19) and not blockedFor(21))
+	ns.Select.Reset(); W.now = W.now + 1
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	check("out of range: still just 5 s (people move)", blockedFor(4) and not blockedFor(6))
+	ns.Select.Reset(); W.now = W.now + 1
+	fail(E.g.SPELL_FAILED_AURA_BOUNCED)
+	check("a stronger buff already there: 300 s", blockedFor(299) and not blockedFor(301))
+	ns.Select.Reset(); W.now = W.now + 1000
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT); W.now = W.now + 30; ns.Select.Reset()
+	ns.ForgetFailures()
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("/wellmet forget also forgets the line-of-sight history (back to 20 s)", blockedFor(19) and not blockedFor(21))
+	check("the log names the skip length", WM:BuildReport():find("skipping Stranger for 20s", 1, true) ~= nil and WM:BuildReport():find("skipping Stranger for 60s", 1, true) ~= nil)
 end
 
 ----------------------------------------------------------------------
