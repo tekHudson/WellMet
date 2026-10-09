@@ -6,12 +6,14 @@ Bind one key. Each press buffs **you**, then the **next person nearby who needs 
 
 ## Who it's for
 
-| Class | Your own buffs | On other players |
+| Class | What it buffs | Extra for yourself |
 |---|---|---|
-| **Paladin** | Aura (Devotion by default), optional Righteous Fury | One blessing per class: Might, Wisdom, Kings, Salvation (group only) or Light. For strangers, an optional secondary blessing when someone else already gave them your primary |
-| **Mage** | Armor (best Frost/Ice Armor you've learned, or Mage Armor) | Arcane Intellect, optional Dampen or Amplify Magic (group only) |
-| **Druid** | none | Mark of the Wild, optional Thorns |
-| **Priest** | Inner Fire | Power Word: Fortitude, Divine Spirit, optional Shadow Protection |
+| **Paladin** | One blessing per class: Might, Wisdom, Kings, Salvation (group and you only) or Light. For strangers, an optional secondary blessing when someone else already gave them your primary | Aura (Devotion by default), optional Righteous Fury |
+| **Mage** | Arcane Intellect, optional Dampen or Amplify Magic (group and you only) | Armor (best Frost/Ice Armor you've learned, or Mage Armor) |
+| **Druid** | Mark of the Wild, optional Thorns | none |
+| **Priest** | Power Word: Fortitude, Divine Spirit, optional Shadow Protection | Inner Fire |
+
+Everything in the middle column can go on **you, your group and strangers**, and each of those three has its own choices (see below). The last column is only for yourself.
 
 The group versions (Prayer of Fortitude, Gift of the Wild, Arcane Brilliance and so on) count as already having the buff.
 
