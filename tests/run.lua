@@ -1338,30 +1338,16 @@ do
 		castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, message)
 	end
 	local function blockedFor(seconds) return (ns.Select.IsBlocked("G-s", WIS, W.now + seconds)) end
-	ns.Select.Reset(); ns.ForgetFailures()
+	ns.Select.Reset()
 	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("first line-of-sight failure: skipped for 20 s", blockedFor(19) and not blockedFor(21))
-	W.now = W.now + 30; ns.Select.Reset()
-	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("the same person fails line of sight again soon after: skipped for 60 s", blockedFor(59) and not blockedFor(61))
-	W.now = W.now + 70; ns.Select.Reset()
-	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("...and stays at 60 s while it keeps failing", blockedFor(59) and not blockedFor(61))
-	W.now = W.now + 300; ns.Select.Reset()
-	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("a failure long after the last one starts again at 20 s", blockedFor(19) and not blockedFor(21))
+	check("line of sight: skipped for 5 s, however often it repeats", blockedFor(4) and not blockedFor(6))
 	ns.Select.Reset(); W.now = W.now + 1
 	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
 	check("out of range: still just 5 s (people move)", blockedFor(4) and not blockedFor(6))
 	ns.Select.Reset(); W.now = W.now + 1
 	fail(E.g.SPELL_FAILED_AURA_BOUNCED)
 	check("a stronger buff already there: 300 s", blockedFor(299) and not blockedFor(301))
-	ns.Select.Reset(); W.now = W.now + 1000
-	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT); W.now = W.now + 30; ns.Select.Reset()
-	ns.ForgetFailures()
-	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("/wellmet forget also forgets the line-of-sight history (back to 20 s)", blockedFor(19) and not blockedFor(21))
-	check("the log names the skip length", WM:BuildReport():find("skipping Stranger for 20s", 1, true) ~= nil and WM:BuildReport():find("skipping Stranger for 60s", 1, true) ~= nil)
+	check("the log names the skip length", WM:BuildReport():find("skipping Stranger for 5s", 1, true) ~= nil)
 end
 
 ----------------------------------------------------------------------

@@ -156,7 +156,7 @@ function WM:SetupSlash()
 			local on = WM:ToggleDebug()
 			WM:Print("debug: " .. (on and "ON (recording the log, showing press messages)" or "OFF") .. "  (/wellmet log opens the copyable log)")
 		elseif command == "forget" then
-			ns.Select.Reset(); ns.ForgetFailures(); WM:Print("forgot who was recently tried")
+			ns.Select.Reset(); WM:Print("forgot who was recently tried")
 		elseif command == "self" or command == "party" or command == "raid" or command == "others" then
 			local section = (command == "raid") and "party" or command
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel

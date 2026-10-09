@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Changed
+- Someone out of line of sight is skipped for 5 seconds, the same as out of range (was 20, and 60 on a repeat).
 
 ## [1.0.0] - 2026-10-07
 ### Added

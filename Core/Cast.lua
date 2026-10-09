@@ -21,9 +21,7 @@ local CLICK_ACTION = "CLICK " .. BUTTON_NAME .. ":LeftButton"
 
 local TRIED_SECONDS    = 8     -- skip someone we just cast on (until the aura shows)
 local FAILED_SECONDS   = 5     -- out of range: people move
-local LOS_SECONDS      = 20    -- line of sight: someone behind a wall usually stays behind it
-local LOS_REPEAT_SECONDS = 60  -- ...and when the same person fails line of sight again soon after
-local LOS_REPEAT_WINDOW  = 120
+local LOS_SECONDS      = 5     -- line of sight: people move around corners
 local QUEUE_WINDOW     = 0.4   -- a press this close to the end of the cooldown goes through (the game queues it)
 local STRONGER_SECONDS = 300   -- a stronger buff from someone else is already on them
 local DEBOUNCE         = 0.15
@@ -229,9 +227,6 @@ local function onSucceeded(_, castGUID)
 	WM.pending = nil
 end
 
-local losFails = {}          -- target key -> time of its last line-of-sight failure
-function ns.ForgetFailures() for k in pairs(losFails) do losFails[k] = nil end end
-
 local function onError(_, message)
 	local p = pendingRecent()
 	local kind = failureKind(message)
@@ -240,10 +235,7 @@ local function onError(_, message)
 	if kind == "stronger" then
 		seconds = STRONGER_SECONDS
 	elseif kind == "los" then
-		local last = losFails[p.key]
-		local now = GetTime()
-		seconds = (last and now - last < LOS_REPEAT_WINDOW) and LOS_REPEAT_SECONDS or LOS_SECONDS
-		losFails[p.key] = now
+		seconds = LOS_SECONDS
 	end
 	ns.Select.Mark(p.key, p.spell, seconds)
 	WM:Log("cast failed:", ns.SafeStr(message), "-> skipping", p.name, "for", seconds .. "s")
