@@ -1687,5 +1687,55 @@ do
 	check("the checkbox and button are in the settings", E.g.WellMetStripResetButton ~= nil)
 end
 
+----------------------------------------------------------------------
+print("== Set all classes")
+do
+	local WM, ns, E, W = load()
+	local cfg = WM.db.party
+	local N = #ns.TargetClasses
+	ns.SetAllAssign(cfg, "assign", "KINGS")
+	check("Paladin: clicking a blessing sets every class to it", ns.AssignCount(cfg, "assign", "KINGS") == N)
+	check("...and the per-class choice still reads back that way", ns.AssignedKey(cfg, "WARRIOR") == "KINGS" and ns.AssignedKey(cfg, "MAGE") == "KINGS")
+	cfg.assign.MAGE = "WISDOM"
+	check("one class changed by hand: the count shows N-1 for Kings, 1 for Wisdom", ns.AssignCount(cfg, "assign", "KINGS") == N - 1 and ns.AssignCount(cfg, "assign", "WISDOM") == 1)
+	ns.SetAllAssign(cfg, "assign", "KINGS")
+	check("a click when only some have it gives it to all", ns.AssignCount(cfg, "assign", "KINGS") == N)
+	ns.SetAllAssign(cfg, "assign", "KINGS")
+	check("a click when every class already has it clears them all (skip)", ns.AssignCount(cfg, "assign", "NONE") == N)
+	ns.SetAllAssign(cfg, "assign", "NONE")
+	check("clicking skip when everything is skipped changes nothing", ns.AssignCount(cfg, "assign", "NONE") == N)
+	ns.SetAllAssign(cfg, "assign", "MIGHT")
+	check("skipped classes get a blessing again", ns.AssignCount(cfg, "assign", "MIGHT") == N)
+
+	local others = WM.db.others
+	check("fallback: no class has one at first", ns.AssignCount(others, "assign2", "NONE") == N)
+	ns.SetAllAssign(others, "assign2", "WISDOM")
+	check("fallback: every class gets Wisdom as its fallback", ns.AssignCount(others, "assign2", "WISDOM") == N and ns.Select.SecondaryFor(WM.caster, "WARRIOR", others, WM.caster.buffs.MIGHT) == WM.caster.buffs.WISDOM)
+	ns.SetAllAssign(others, "assign2", "WISDOM")
+	check("fallback: clicking it again removes it from all", ns.AssignCount(others, "assign2", "NONE") == N)
+
+	-- stack mode
+	local WM2, ns2 = load({ class = "MAGE" })
+	local mage = WM2.caster
+	local stack = WM2.db.party.stack
+	local dampen, amplify = mage.buffs.DAMPEN, mage.buffs.AMPLIFY
+	check("Mage: Dampen starts on for no class", ns2.StackCount(dampen, stack) == 0)
+	ns2.SetAllStack(mage, dampen, stack)
+	check("Mage: clicking Dampen adds it to every class", ns2.StackCount(dampen, stack) == N)
+	ns2.SetAllStack(mage, amplify, stack)
+	check("Mage: adding Amplify to all switches Dampen off everywhere (they exclude each other)", ns2.StackCount(amplify, stack) == N and ns2.StackCount(dampen, stack) == 0)
+	ns2.SetAllStack(mage, amplify, stack)
+	check("Mage: clicking Amplify again removes it from all", ns2.StackCount(amplify, stack) == 0)
+	local intellect = mage.buffs.INTELLECT
+	local before = ns2.StackCount(intellect, stack)
+	check("Mage: Arcane Intellect starts on for the mana classes only", before > 0 and before < N)
+	ns2.SetAllStack(mage, intellect, stack)
+	check("Mage: a click with only some on adds it to all", ns2.StackCount(intellect, stack) == N)
+
+	-- the settings pages carry the section
+	local src = readFile("UI/Options.lua")
+	check("both group pages build the Set all section above the class table", select(2, src:gsub("buildSetAll%(panel, \"", "")) == 2)
+end
+
 print(string.format("\n%d passed, %d failed", passes, failures))
 os.exit(failures == 0 and 0 or 1)

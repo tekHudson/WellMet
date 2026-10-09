@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- "Set all classes" on the Party / Raid and Others pages: one icon per buff above the class table. Click a blessing (Paladin)
+  to give it to every class, or click it again to clear them all; the red cross skips every class, and Others has a second
+  row for the fallback blessing. For Mage, Druid and Priest an icon adds that buff to every class, or removes it when they
+  all have it. A count like 4/9 shows when only some classes match, and you can still change any single class afterwards.
 - An optional reminder strip (settings > General, or `/wellmet strip`): three small chips, Self / Party / Raid, that show
   how many people the key would buff right now. Orange with a count means someone needs a buff, a check means everyone is
   covered, a grey "?" means the game is hiding buffs (combat). Party is your own party, Raid is the rest of your raid.

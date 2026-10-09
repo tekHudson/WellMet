@@ -91,6 +91,45 @@ function ns.StackSet(caster, buff, class, on, stack)
 	end
 end
 
+-- "Set all classes" (Party / Raid and Others pages). All of these act on every class in ns.TargetClasses at once.
+-- Assign mode (Paladin): `field` is "assign" (the primary) or "assign2" (the stranger fallback).
+local function assignValue(cfg, field, class)
+	if field == "assign" then return ns.AssignedKey(cfg, class) end
+	return cfg.assign2[class] or "NONE"
+end
+
+-- How many classes are set to `key` ("NONE" counts the skipped / no-fallback ones).
+function ns.AssignCount(cfg, field, key)
+	local n = 0
+	for _, class in ipairs(ns.TargetClasses) do
+		if assignValue(cfg, field, class) == key then n = n + 1 end
+	end
+	return n
+end
+
+-- Click on a blessing: every class gets it. When every class already has it, the click clears them all instead.
+-- (Clicking "none" when everything is already none changes nothing.)
+function ns.SetAllAssign(cfg, field, key)
+	local target = key
+	if key ~= "NONE" and ns.AssignCount(cfg, field, key) == #ns.TargetClasses then target = "NONE" end
+	for _, class in ipairs(ns.TargetClasses) do cfg[field][class] = target end
+end
+
+-- Stack mode (Mage, Druid, Priest): how many classes have this buff switched on.
+function ns.StackCount(buff, stack)
+	local n = 0
+	for _, class in ipairs(ns.TargetClasses) do
+		if ns.StackEnabled(buff, class, stack) then n = n + 1 end
+	end
+	return n
+end
+
+-- Click on a buff: add it to every class, or remove it from every class when they all have it already.
+function ns.SetAllStack(caster, buff, stack)
+	local on = ns.StackCount(buff, stack) < #ns.TargetClasses
+	for _, class in ipairs(ns.TargetClasses) do ns.StackSet(caster, buff, class, on, stack) end
+end
+
 -- The buff key a section assigns to a target class.
 function ns.AssignedKey(section, class)
 	return section.assign[class] or ns.DefaultAssign[class]

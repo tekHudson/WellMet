@@ -215,6 +215,101 @@ local SECTION_TITLE = { self = "Self", party = "Party / Raid", others = "Others"
 local SECTION_CHECK_WIDTH = { self = 110, party = 190, others = 130 }          -- room each checkbox and its label take in the row
 local panels = {}                   -- section key -> panel (nil when the class has no such section)
 
+-- A round-ish icon button for the "Set all" rows. `update(count)` shows how many classes have it: lit with a gold
+-- edge when all of them do, a dim gold edge and a count when some do, greyed when none do.
+local function makeBulkButton(parent, x, y, texture, dimIcon, tipLines, countFn, onClick)
+	local b = CreateFrame("Button", nil, parent)
+	b:SetSize(26, 26)
+	b:SetPoint("TOPLEFT", x, y)
+	local icon = b:CreateTexture(nil, "ARTWORK")
+	icon:SetAllPoints()
+	icon:SetTexture(texture)
+	local edge = b:CreateTexture(nil, "OVERLAY")
+	edge:SetPoint("CENTER")
+	edge:SetSize(46, 46)
+	edge:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+	edge:SetBlendMode("ADD")
+	local hover = b:CreateTexture(nil, "HIGHLIGHT")
+	hover:SetAllPoints()
+	hover:SetColorTexture(1, 1, 1, 0.2)
+	local count = b:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+	count:SetPoint("BOTTOMRIGHT", 4, -3)
+	local total = #ns.TargetClasses
+	b.refresh = function()
+		local n = countFn()
+		local all, some = n == total, n > 0 and n < total
+		edge:SetShown(all or some)
+		edge:SetVertexColor(1, 0.82, 0, all and 1 or 0.45)
+		icon:SetDesaturated(not all and not some)
+		icon:SetAlpha(dimIcon and 0.5 or (all and 1 or some and 0.85 or 0.55))
+		count:SetText(some and (n .. "/" .. total) or "")
+	end
+	b:SetScript("OnClick", onClick)
+	b:SetScript("OnEnter", function(self)
+		local n = countFn()
+		GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+		GameTooltip_SetTitle(GameTooltip, tipLines.title)
+		GameTooltip_AddNormalLine(GameTooltip, n == total and tipLines.all or (n > 0 and (n .. " of " .. total .. " classes. " .. tipLines.some) or tipLines.none))
+		GameTooltip:Show()
+	end)
+	b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	return b
+end
+
+-- The "Set all classes" section above a class table: one icon per buff, click to change every class at once.
+-- Returns the y below it.
+local function buildSetAll(panel, sectionKey, y)
+	local caster, cfg = WM.caster, WM.db[sectionKey]
+	local buttons = {}
+	local function refreshAll() for _, b in ipairs(buttons) do b.refresh() end end
+	local function clicked() for _, r in ipairs(panel.refreshers) do r() end end
+	panel.refreshBulk = refreshAll
+	panel.refreshers[#panel.refreshers + 1] = refreshAll
+
+	makeHeader(panel, "Set all classes", 16, y); y = y - 28
+
+	local function addRow(label, make)
+		local text = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+		text:SetPoint("TOPLEFT", 24, y - 4)
+		text:SetText(label)
+		local x = 150
+		make(function(...) buttons[#buttons + 1] = makeBulkButton(panel, x, y, ...); x = x + 32 end)
+		y = y - 32
+	end
+
+	if caster.mode == "stack" then
+		addRow("Add / remove", function(add)
+			for _, o in ipairs(stackOptions(caster, sectionKey)) do
+				local buff = caster.buffs[o.value]
+				add(ns.SpellIcon(buff), unknownBuff(buff),
+					{ title = buff.name, all = "Every class has it. Click to remove it from all.", some = "Click to add it to all.", none = "No class has it. Click to add it to all." },
+					function() return ns.StackCount(buff, cfg.stack) end,
+					function() ns.SetAllStack(caster, buff, cfg.stack); clicked() end)
+			end
+		end)
+	else
+		local function assignRow(label, field, noneName)
+			addRow(label, function(add)
+				for _, o in ipairs(assignOptions(caster, sectionKey)) do
+					local key = o.value
+					local buff = caster.buffs[key]
+					local isNone = key == "NONE"
+					add(isNone and SKIP_ICON or ns.SpellIcon(buff), isNone or unknownBuff(buff),
+						{ title = isNone and noneName or buff.name,
+						  all = isNone and "Every class is set to this." or "Every class has it. Click to clear them all.",
+						  some = isNone and "Click to set every class to this." or "Click to give it to all.",
+						  none = "Click to set every class to this." },
+						function() return ns.AssignCount(cfg, field, key) end,
+						function() ns.SetAllAssign(cfg, field, key); clicked() end)
+				end
+			end)
+		end
+		assignRow(sectionKey == "others" and "Primary" or "Blessing", "assign", "Skip these classes")
+		if sectionKey == "others" then assignRow("Secondary", "assign2", "No fallback") end
+	end
+	return y - 6
+end
+
 -- The "which buffs on which class" table for one section (Party / Raid or Others): one row per target class,
 -- alphabetical by displayed name. Assign mode (Paladin): a one-choice dropdown. Stack mode (Mage, Druid): a
 -- checkbox dropdown. Returns the y below the table.
@@ -245,6 +340,7 @@ local function buildClassTable(panel, sectionKey, y)
 				function(key)
 					local buff = caster.buffs[key]
 					ns.StackSet(caster, buff, class, not ns.StackEnabled(buff, class, cfg.stack), cfg.stack)
+					if panel.refreshBulk then panel.refreshBulk() end
 				end,
 				function(on)
 					if #on == 0 then return "|cffaaaaaanone|r" end
@@ -258,14 +354,14 @@ local function buildClassTable(panel, sectionKey, y)
 		else
 			dd = makeDropdown(panel, name, 70, 150, y + 2, function() return assignOptions(caster, sectionKey) end,
 				function() return ns.AssignedKey(cfg, class) end,
-				function(v) cfg.assign[class] = v end,
+				function(v) cfg.assign[class] = v; if panel.refreshBulk then panel.refreshBulk() end end,
 				function(value) return assignIcon(caster, value) end)
 		end
 		panel.refreshers[#panel.refreshers + 1] = dd.refresh
 		if withSecondary then
 			local dd2 = makeDropdown(panel, name .. "Second", 70, 240, y + 2, function() return assignOptions(caster, sectionKey, true) end,
 				function() return cfg.assign2[class] or "NONE" end,
-				function(v) cfg.assign2[class] = v end,
+				function(v) cfg.assign2[class] = v; if panel.refreshBulk then panel.refreshBulk() end end,
 				function(value) return assignIcon(caster, value) end)
 			panel.refreshers[#panel.refreshers + 1] = dd2.refresh
 		end
@@ -347,6 +443,7 @@ local function buildPartyPanel(caster)
 		"Buffs for the people in your group. Each section has its own choices, so this table can differ from Others.")
 	local y = -76
 	y = buildRadius(panel, "party", y)
+	y = buildSetAll(panel, "party", y)
 	makeHeader(panel, caster.title, 16, y); y = y - 28
 	buildClassTable(panel, "party", y)
 	return panel
@@ -371,6 +468,7 @@ local function buildOthersPanel(caster)
 		npButton:SetShown(on == false)
 	end
 	y = y - 40
+	y = buildSetAll(panel, "others", y)
 	makeHeader(panel, caster.title, 16, y); y = y - 28
 	buildClassTable(panel, "others", y)
 	return panel
