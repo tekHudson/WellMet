@@ -5,6 +5,11 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- An optional reminder strip (settings > General, or `/wellmet strip`): three small chips, Self / Party / Raid, that show
+  how many people the key would buff right now. Orange with a count means someone needs a buff, a check means everyone is
+  covered, a grey "?" means the game is hiding buffs (combat). Party is your own party, Raid is the rest of your raid.
+  Shift-drag to move it. Off by default.
 ### Changed
 - Someone out of line of sight is skipped for 5 seconds, the same as out of range (was 20, and 60 on a repeat).
 

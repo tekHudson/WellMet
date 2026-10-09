@@ -104,8 +104,10 @@ local function groupUnits()
 	return units
 end
 
+-- `opts.groupOnly`: leave strangers (target, nameplates) out, e.g. for the reminder strip.
 -- Returns: candidates (list), rejected (list of { unit, reason }), info (table).
-function Discovery.Discover()
+function Discovery.Discover(opts)
+	local withStrangers = not (opts and opts.groupOnly)
 	local now = GetTime()
 	local list, byKey, rejected = {}, {}, {}
 	local info = { nameplates = 0 }
@@ -135,11 +137,11 @@ function Discovery.Discover()
 		end
 	end
 
-	if WM.db.others.enabled and UnitExists("target") and not UnitIsUnit("target", "player") then
+	if withStrangers and WM.db.others.enabled and UnitExists("target") and not UnitIsUnit("target", "player") then
 		add("target", 2)
 	end
 
-	if WM.db.others.enabled then
+	if withStrangers and WM.db.others.enabled then
 		local plates = C_NamePlate.GetNamePlates()
 		info.nameplates = plates and #plates or 0
 		for _, plate in ipairs(plates or {}) do

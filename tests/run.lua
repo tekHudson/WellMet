@@ -80,6 +80,7 @@ local function newEnv(W)
 	g.IsInRaid = function() return W.raid end
 
 	g.GetNumGroupMembers = function() return W.groupSize end
+	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
 	g.IsShiftKeyDown = function() return false end
@@ -1598,6 +1599,92 @@ do
 		local _, ns3 = load({ class = "MAGE", login = false })
 		check("Paladin and Mage are supported", ns3.supported == true and select(2, load({ login = false })).supported == true)
 	end
+end
+
+----------------------------------------------------------------------
+print("== Reminder strip")
+do
+	local WM, ns, E, W = load()
+	W.units.player.auras = { ["Blessing of Wisdom"] = true, ["Devotion Aura"] = true }
+	W.spells["Devotion Aura"] = 465; W.known[465] = true
+	local function chips(model) local t = {} for _, c in ipairs(model) do t[c.key] = c end return t end
+	local function model() return chips(ns.StripModel()) end
+
+	check("off by default, with a saved position", WM.db.strip.enabled == false and WM.db.strip.point == "TOP")
+	check("the strip frame exists and is hidden while off", E.g.WellMetStrip ~= nil)
+
+	-- solo: only Self
+	W.groupSize = 0
+	local m = model()
+	check("solo and everything buffed: just a Self chip, all covered", m.self and m.self.state == "ok" and not m.party and not m.raid)
+	W.units.player.auras = { ["Blessing of Wisdom"] = true }
+	m = model()
+	check("Self lacks its aura: Self needs 1", m.self.state == "need" and m.self.count == 1)
+
+	-- a 5-man group: Self + Party, no Raid chip
+	W.units.player.auras = { ["Blessing of Wisdom"] = true, ["Devotion Aura"] = true }
+	W.groupSize = 3
+	addUnit(W, "party1", { class = "WARRIOR", name = "Brakka", guid = "G-1", auras = {} })
+	addUnit(W, "party2", { class = "WARRIOR", name = "Thistle", guid = "G-2", auras = {} })
+	m = model()
+	check("a party where two people lack Might: Party 2, no Raid chip", m.party and m.party.state == "need" and m.party.count == 2 and not m.raid)
+	W.units.party1.inRange = false
+	check("someone out of cast range is not counted (the key would skip them too)", model().party.count == 1)
+	W.units.party1.inRange = true
+	W.units.party1.auras = { ["Blessing of Might"] = true }; W.units.party2.auras = { ["Blessing of Might"] = true }
+	check("everyone covered: Party shows all covered", model().party.state == "ok" and model().party.count == 0)
+
+	-- a raid: Party is your own subgroup, Raid is the rest
+	W.raid = true; W.groupSize = 4; W.subgroups = { 1, 1, 2, 2 }
+	W.units.party1, W.units.party2 = nil, nil
+	addUnit(W, "raid1", { class = "PALADIN", name = "Tek", guid = "Player-Tek", auras = {} })
+	addUnit(W, "raid2", { class = "WARRIOR", name = "Brakka", guid = "G-1", auras = {} })
+	addUnit(W, "raid3", { class = "WARRIOR", name = "Thistle", guid = "G-2", auras = {} })
+	addUnit(W, "raid4", { class = "WARRIOR", name = "Moonwick", guid = "G-3", auras = {} })
+	m = model()
+	check("raid: one subgroup-mate needs Might -> Party 1; two others -> Raid 2", m.party.count == 1 and m.raid.count == 2 and m.raid.state == "need")
+	check("the chips come in the order Self, Party, Raid", (function() local o = ns.StripModel(); return o[1].key == "self" and o[2].key == "party" and o[3].key == "raid" end)())
+
+	-- sections off
+	WM.db.party.enabled = false
+	m = model()
+	check("Party / Raid section off: no Party or Raid chip", m.self and not m.party and not m.raid)
+	WM.db.party.enabled = true
+	WM.db.self.enabled = false
+	check("Self section off: no Self chip", not model().self and model().party ~= nil)
+	WM.db.self.enabled = true
+
+	-- strangers are not counted
+	W.raid = false; W.groupSize = 0
+	addUnit(W, "nameplate1", { class = "WARRIOR", name = "Stranger", guid = "G-s", interact = "near", auras = {} })
+	W.plates = { "nameplate1" }
+	m = model()
+	check("strangers (Others) never count toward a chip", m.self.state == "ok" and not m.party and not m.raid)
+
+	-- combat / hidden auras: can't tell
+	W.restricted = true
+	m = model()
+	check("auras hidden: every chip says it can't tell", m.self.state == "unknown")
+	W.restricted = false; W.combat = true
+	check("in combat: can't tell either", model().self.state == "unknown")
+	W.combat = false
+
+	-- showing it: the setting turns the frame on, a look fills the chips
+	WM.db.strip.enabled = true
+	WM:ApplyStrip()
+	check("turning it on looks right away", WM.stripModel ~= nil and WM.stripModel[1].key == "self")
+	local strip = E.g.WellMetStrip
+	check("it re-looks on a timer while shown", type(strip.scripts.OnUpdate) == "function")
+	WM.stripModel = nil
+	strip.scripts.OnUpdate(strip, 0.2)
+	check("...but not more than about once a second", WM.stripModel == nil)
+	strip.scripts.OnUpdate(strip, 1)
+	check("...and it does once the second is up", WM.stripModel ~= nil)
+	WM:ResetStripPosition()
+	check("reset puts it back at the default spot", WM.db.strip.point == "TOP" and WM.db.strip.y == -140)
+	E.g.SlashCmdList.WELLMET("strip")
+	check("/wellmet strip toggles it", WM.db.strip.enabled == false)
+	check("the checkbox and button are in the settings", E.g.WellMetStripResetButton ~= nil)
 end
 
 print(string.format("\n%d passed, %d failed", passes, failures))

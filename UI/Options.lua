@@ -418,7 +418,11 @@ local function buildMainPanel(subs)
 	check("Allow casting while mounted (dismounts you)", function() return WM.db.allowMounted end, function(v) WM.db.allowMounted = v and true or false end)
 	check("Show the minimap button", function() return not WM.db.minimap.hide end,
 		function(v) WM.db.minimap.hide = not v; if WM.minimap then WM.minimap:SetShown(v) end end)
-	y = y - 6
+	check("Show the reminder strip (Self / Party / Raid: who still needs a buff)", function() return WM.db.strip.enabled end,
+		function(v) WM.db.strip.enabled = v and true or false; WM:ApplyStrip() end)
+	makeButton(panel, "Reset strip position", 150, 44, y + 2, function() WM:ResetStripPosition() end, "WellMetStripResetButton")
+	makeText(panel, "Shift-drag the strip to move it.", 204, y - 2)
+	y = y - 30
 	-- Debug records the log and shows why a press did nothing. The button shows the state and flips it.
 	local debugButton
 	debugButton = makeButton(panel, "", 110, 24, y, function()

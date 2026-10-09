@@ -13,6 +13,7 @@ Layout:
   Core/Cast.lua       the secure button, PreClick pick, keybind, cast feedback
   Core/Debug.lua      /wellmet log: copyable state dump + event log
   UI/Options.lua      Settings panel
+  UI/Strip.lua        The Self / Party / Raid reminder strip
 ]]
 
 local ADDON, ns = ...
@@ -117,6 +118,7 @@ function WM:PLAYER_LOGIN()
 	WM:InitCast()
 	WM:CreateOptions()
 	WM:CreateMinimap()
+	WM:CreateStrip()
 
 	WM:RegisterEvent("SPELLS_CHANGED")
 	WM:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -160,10 +162,15 @@ function WM:SetupSlash()
 		elseif command == "self" or command == "party" or command == "raid" or command == "others" then
 			local section = (command == "raid") and "party" or command
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
+		elseif command == "strip" then
+			WM.db.strip.enabled = not WM.db.strip.enabled
+			WM:ApplyStrip()
+			WM:Print("reminder strip: " .. (WM.db.strip.enabled and "ON (Shift-drag to move it)" or "OFF"))
+			if WM.refreshOptions then WM.refreshOptions() end
 		elseif command == "macro" then
 			WM:CreateMacro()
 		else
-			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | forget | debug  (set the key under Key Bindings > WellMet)")
+			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | strip | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
 		end
 	end
