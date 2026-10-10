@@ -6,7 +6,8 @@ Dark with a grey ? = can't tell (Forever hides other players' buffs in combat). 
 together. An icon whose section is switched off (or Group when you are not in a group) is not drawn. Strangers
 (Others) are not counted: they are only found when you press the key.
 
-Off by default (settings > General). Shift-drag moves it.
+Off by default (settings > Buff reminder). With "only when a buff is missing" an icon is drawn only while it needs one.
+Shift-drag moves it.
 ]]
 
 local ADDON, ns = ...
@@ -57,7 +58,15 @@ function ns.StripModel()
 	return model
 end
 
-local strip, chips
+-- Which of the model's icons get drawn: all of them, or with "only when a buff is missing" just the ones that need one.
+function ns.StripDrawn(model)
+	if not WM.db.strip.onlyWhenMissing then return model end
+	local missing = {}
+	for _, m in ipairs(model) do if m.state == "need" then missing[#missing + 1] = m end end
+	return missing
+end
+
+local strip, chips, driver
 local elapsed = 0
 
 local function build()
@@ -115,10 +124,14 @@ local function build()
 		mark:SetTextColor(0.75, 0.75, 0.75)
 		chips[chip.key] = { frame = f, icon = icon, glow = glow, check = check, mark = mark }
 	end
-	strip:SetScript("OnUpdate", function(_, dt)
+	-- The timer lives on its own frame: the strip itself is hidden whenever there is nothing to draw, and a hidden
+	-- frame gets no OnUpdate, so it could never come back.
+	driver = CreateFrame("Frame", "WellMetStripDriver", UIParent)
+	driver:SetScript("OnUpdate", function(_, dt)
 		elapsed = elapsed + dt
 		if elapsed >= INTERVAL then elapsed = 0; WM:RefreshStrip() end
 	end)
+	driver:Hide()
 end
 
 function WM:RefreshStrip()
@@ -126,6 +139,7 @@ function WM:RefreshStrip()
 	local model = ns.StripModel()
 	WM.stripModel = model
 	for _, c in pairs(chips) do c.frame:Hide() end
+	model = ns.StripDrawn(model)
 	for i, m in ipairs(model) do
 		local c = chips[m.key]
 		local need, ok = m.state == "need", m.state == "ok"
@@ -153,10 +167,12 @@ function WM:ApplyStrip()
 	if not strip then return end
 	if WM.db.strip.enabled then
 		place()
+		driver:Show()
 		strip:Show()
 		elapsed = 0
 		WM:RefreshStrip()
 	else
+		driver:Hide()
 		strip:Hide()
 	end
 end

@@ -1671,18 +1671,33 @@ do
 	WM.db.strip.enabled = true
 	WM:ApplyStrip()
 	check("turning it on looks right away", WM.stripModel ~= nil and WM.stripModel[1].key == "self")
-	local strip = E.g.WellMetStrip
-	check("it re-looks on a timer while shown", type(strip.scripts.OnUpdate) == "function")
+	local driver = E.g.WellMetStripDriver
+	check("it re-looks on a timer while on (the timer is not on the strip, which can be hidden)", type(driver.scripts.OnUpdate) == "function" and E.g.WellMetStrip.scripts.OnUpdate == nil)
 	WM.stripModel = nil
-	strip.scripts.OnUpdate(strip, 0.2)
+	driver.scripts.OnUpdate(driver, 0.2)
 	check("...but not more than about once a second", WM.stripModel == nil)
-	strip.scripts.OnUpdate(strip, 1)
+	driver.scripts.OnUpdate(driver, 1)
 	check("...and it does once the second is up", WM.stripModel ~= nil)
+
+	-- only when a buff is missing: draw just the icons that need one
+	check("only-when-missing is off by default, so every icon is drawn", WM.db.strip.onlyWhenMissing == false and #ns.StripDrawn(ns.StripModel()) == #ns.StripModel())
+	WM.db.strip.onlyWhenMissing = true
+	W.units.player.auras = { ["Blessing of Wisdom"] = true, ["Devotion Aura"] = true }
+	check("only-when-missing: everything covered, nothing is drawn", #ns.StripDrawn(ns.StripModel()) == 0)
+	W.units.player.auras = { ["Blessing of Wisdom"] = true }
+	local drawn = ns.StripDrawn(ns.StripModel())
+	check("only-when-missing: a missing buff brings its icon back, and only that one", #drawn == 1 and drawn[1].key == "self")
+	W.combat = true
+	check("only-when-missing: in combat (can't tell) nothing is drawn", #ns.StripDrawn(ns.StripModel()) == 0)
+	W.combat = false
+	WM:RefreshStrip()
+	WM.db.strip.onlyWhenMissing = false
 	WM:ResetStripPosition()
 	check("reset puts it back at the default spot", WM.db.strip.point == "TOP" and WM.db.strip.y == -140)
 	E.g.SlashCmdList.WELLMET("strip")
 	check("/wellmet strip toggles it", WM.db.strip.enabled == false)
 	check("the reset button is in the settings", E.g.WellMetStripResetButton ~= nil)
+	check("the settings page has a Buff reminder section with both checkboxes", (function() local o = readFile("UI/Options.lua"); return o:find("\"Buff reminder\"", 1, true) and o:find("Show UI buff reminder", 1, true) and o:find("Show only when a buff is missing", 1, true) end)() ~= nil)
 	local src = readFile("UI/Strip.lua")
 	check("the strip uses the LFG one-person and group icons", src:find("INV_Misc_GroupLooking", 1, true) ~= nil and src:find("INV_Misc_GroupNeedMore", 1, true) ~= nil)
 end
