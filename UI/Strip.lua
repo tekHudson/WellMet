@@ -1,10 +1,10 @@
---[[ WellMet — the reminder strip: three small chips, Self / Party / Raid, that say who still needs a buff.
+--[[ WellMet — the reminder strip: two action-button style icons, Self and Group, that say who still needs a buff.
 
-A chip shows how many people in that group the key would buff right now (same rules as a key press: in
-range, learned, section on, not just tried). Orange with a count = someone needs a buff; a check = all
-covered; grey "?" = can't tell (Forever hides other players' buffs in combat). Party is your own party,
-Raid is everyone else in your raid, so in a 5-man group there is no Raid chip. Strangers (Others) are not
-counted: they are only found when you press the key.
+An icon is lit (gold glowing edge) when someone it stands for needs a buff the key would cast right now (same rules
+as a key press: in range, learned, section on, not just tried). Dark with a green check = everyone is covered.
+Dark with a grey ? = can't tell (Forever hides other players' buffs in combat). Group is your party and your raid
+together. An icon whose section is switched off (or Group when you are not in a group) is not drawn. Strangers
+(Others) are not counted: they are only found when you press the key.
 
 Off by default (settings > General). Shift-drag moves it.
 ]]
@@ -14,51 +14,32 @@ if not ns.supported then return end      -- this class has no buffs: WellMet doe
 local WM = ns.WM
 
 local INTERVAL = 1        -- seconds between looks while it is shown
-local CHIP_W, CHIP_H, GAP = 66, 22, 4
-local CHECK = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12|t"
+local SIZE, GAP = 40, 6
 
+-- One person / a group of people (the Looking-for-Group icons). Change the paths here to change the art.
 local CHIPS = {
-	{ key = "self",  label = "Self" },
-	{ key = "party", label = "Party" },
-	{ key = "raid",  label = "Raid" },
+	{ key = "self",  label = "Self",  icon = "Interface\\Icons\\INV_Misc_GroupLooking" },
+	{ key = "group", label = "Group", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" },
 }
+local CHECK_TEXTURE = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local GLOW_TEXTURE  = "Interface\\Buttons\\UI-ActionButton-Border"
 
--- Which raid subgroup is this raid unit in? nil when unknown.
-local function subgroupOf(unit)
-	local n = tonumber(unit:match("^raid(%d+)$"))
-	if n and GetRaidRosterInfo then return select(3, GetRaidRosterInfo(n)) end
-end
-
-local function mySubgroup()
-	for i = 1, GetNumGroupMembers() do
-		if UnitIsUnit("raid" .. i, "player") then return subgroupOf("raid" .. i) end
-	end
-end
-
--- The chips to show and what each says. Returns a list of { key, label, count, state }:
+-- The icons to show and what each says. Returns a list of { key, label, count, state }:
 --   state "need" (count people need a buff), "ok" (nobody does), "unknown" (can't tell right now).
--- Pure enough to test: all the game's answers come through ns.Probe and Discovery.
+-- All the game's answers come through ns.Probe and Discovery, so this is testable headless.
 function ns.StripModel()
 	local db = WM.db
-	local inRaid = IsInRaid()
-	local inGroup = inRaid or GetNumGroupMembers() > 0
-	local show = { self = db.self.enabled, party = db.party.enabled and inGroup, raid = db.party.enabled and inRaid }
+	local inGroup = IsInRaid() or GetNumGroupMembers() > 0
+	local show = { self = db.self.enabled, group = db.party.enabled and inGroup }
 
 	local readable = not InCombatLockdown() and ns.AurasReadable()
-	local people = { self = {}, party = {}, raid = {} }
+	local people = { self = {}, group = {} }
 	if readable then
 		local cands = ns.Discovery.Discover({ groupOnly = true })
 		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe }
 		local _, _, eligible = ns.Select.Pick(cands, ctx)
-		local mine = inRaid and mySubgroup() or nil
 		for _, e in ipairs(eligible) do
-			local c = e.cand
-			local bucket = "self"
-			if c.tier == 1 then
-				bucket = "party"
-				if inRaid and mine and subgroupOf(c.unit) ~= mine then bucket = "raid" end
-			end
-			people[bucket][c.key] = true
+			people[e.cand.tier == 0 and "self" or "group"][e.cand.key] = true
 		end
 	end
 
@@ -81,7 +62,7 @@ local elapsed = 0
 
 local function build()
 	strip = CreateFrame("Frame", "WellMetStrip", UIParent)
-	strip:SetSize(CHIP_W, CHIP_H)
+	strip:SetSize(SIZE, SIZE)
 	strip:SetFrameStrata("MEDIUM")
 	strip:SetClampedToScreen(true)
 	strip:SetMovable(true)
@@ -97,35 +78,48 @@ local function build()
 	strip:SetScript("OnEnter", function(self)
 		GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
 		GameTooltip:AddLine("WellMet")
-		GameTooltip:AddLine("Who still needs a buff. Shift-drag to move.", 1, 1, 1)
+		for _, m in ipairs(WM.stripModel or {}) do
+			local text = m.state == "need" and (m.count .. (m.count == 1 and " needs" or " need") .. " a buff")
+				or m.state == "ok" and "everyone is covered" or "can't tell right now (combat)"
+			GameTooltip:AddLine(m.label .. ": " .. text, 1, 1, 1)
+		end
+		GameTooltip:AddLine("Shift-drag to move.", 0.6, 0.6, 0.6)
 		GameTooltip:Show()
 	end)
 	strip:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 	chips = {}
-	for i, chip in ipairs(CHIPS) do
-		local f = CreateFrame("Frame", "WellMetStripChip" .. chip.label, strip)
-		f:SetSize(CHIP_W, CHIP_H)
-		local border = f:CreateTexture(nil, "BACKGROUND")
-		border:SetAllPoints()
-		local bg = f:CreateTexture(nil, "BORDER")
-		bg:SetPoint("TOPLEFT", 1, -1); bg:SetPoint("BOTTOMRIGHT", -1, 1)
-		bg:SetColorTexture(0.09, 0.1, 0.13, 0.9)
-		local text = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-		text:SetPoint("CENTER")
-		chips[chip.key] = { frame = f, border = border, text = text }
+	for _, chip in ipairs(CHIPS) do
+		local f = CreateFrame("Frame", "WellMetStrip" .. chip.label, strip)
+		f:SetSize(SIZE, SIZE)
+		local black = f:CreateTexture(nil, "BACKGROUND")
+		black:SetAllPoints()
+		black:SetColorTexture(0, 0, 0, 1)
+		local icon = f:CreateTexture(nil, "ARTWORK")
+		icon:SetPoint("TOPLEFT", 2, -2); icon:SetPoint("BOTTOMRIGHT", -2, 2)
+		icon:SetTexture(chip.icon)
+		icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+		local glow = f:CreateTexture(nil, "OVERLAY")
+		glow:SetPoint("CENTER")
+		glow:SetSize(SIZE * 1.85, SIZE * 1.85)
+		glow:SetTexture(GLOW_TEXTURE)
+		glow:SetBlendMode("ADD")
+		glow:SetVertexColor(1, 0.8, 0.25)
+		local check = f:CreateTexture(nil, "OVERLAY")
+		check:SetPoint("CENTER")
+		check:SetSize(SIZE * 0.6, SIZE * 0.6)
+		check:SetTexture(CHECK_TEXTURE)
+		local mark = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+		mark:SetPoint("CENTER")
+		mark:SetText("?")
+		mark:SetTextColor(0.75, 0.75, 0.75)
+		chips[chip.key] = { frame = f, icon = icon, glow = glow, check = check, mark = mark }
 	end
 	strip:SetScript("OnUpdate", function(_, dt)
 		elapsed = elapsed + dt
 		if elapsed >= INTERVAL then elapsed = 0; WM:RefreshStrip() end
 	end)
 end
-
-local COLORS = {
-	need    = { 1.00, 0.54, 0.24 },
-	ok      = { 0.31, 0.82, 0.55 },
-	unknown = { 0.55, 0.55, 0.55 },
-}
 
 function WM:RefreshStrip()
 	if not strip or not WM.db.strip.enabled then return end
@@ -134,15 +128,17 @@ function WM:RefreshStrip()
 	for _, c in pairs(chips) do c.frame:Hide() end
 	for i, m in ipairs(model) do
 		local c = chips[m.key]
-		local color = COLORS[m.state]
+		local need, ok = m.state == "need", m.state == "ok"
 		c.frame:ClearAllPoints()
-		c.frame:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (CHIP_W + GAP), 0)
-		c.border:SetColorTexture(color[1], color[2], color[3], m.state == "need" and 1 or 0.45)
-		c.text:SetTextColor(color[1], color[2], color[3])
-		c.text:SetText(m.label .. " " .. (m.state == "need" and m.count or m.state == "ok" and CHECK or "?"))
+		c.frame:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (SIZE + GAP), 0)
+		c.glow:SetShown(need)
+		c.icon:SetDesaturated(not need)
+		c.icon:SetVertexColor(need and 1 or 0.4, need and 1 or 0.4, need and 1 or 0.4)
+		c.check:SetShown(ok)
+		c.mark:SetShown(m.state == "unknown")
 		c.frame:Show()
 	end
-	strip:SetWidth(math.max(1, #model * (CHIP_W + GAP) - GAP))
+	strip:SetWidth(math.max(1, #model * (SIZE + GAP) - GAP))
 	strip:SetShown(#model > 0)
 end
 
