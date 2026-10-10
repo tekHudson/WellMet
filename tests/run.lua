@@ -81,6 +81,11 @@ local function newEnv(W)
 
 	g.GetNumGroupMembers = function() return W.groupSize end
 	g.C_ChatInfo = { InChatMessagingLockdown = function() return W.chatLockdown or false end }
+	g.time = function() return 1700000000 end
+	g.LE_PARTY_CATEGORY_INSTANCE = 2
+	g.IsInGroup = function(cat) if cat then return W.instanceGroup or false end return W.groupSize > 0 end
+	g.GetPlayerInfoByGUID = function(guid) return nil, (W.guidClass or {})[guid] end
+	g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
 	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
@@ -1481,7 +1486,12 @@ do
 	local opened = false
 	WM.ShowLog = function() opened = true end
 	mb.scripts.OnClick(mb, "RightButton")
-	check("right-click opens the log", opened)
+	check("right-click no longer opens the log (it toggles the reminder icons)", not opened)
+	E.g.IsShiftKeyDown = function() return true end
+	mb.scripts.OnClick(mb, "RightButton")
+	check("Shift-click opens the log", opened)
+	E.g.IsShiftKeyDown = function() return false end
+	WM.db.strip.enabled = false
 	check("a fresh profile shows the button by default", load().db.minimap.hide == false)
 end
 
@@ -1782,6 +1792,141 @@ do
 	check("clearing the log clears the chat counts", WM:BuildReport():find("no chat messages seen yet", 1, true) ~= nil)
 	WM:ToggleDebug()
 	check("turning debug off stops listening", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY)))
+end
+
+----------------------------------------------------------------------
+print("== Buff requests (beta)")
+do
+	local WM, ns, E, W = load()
+	local R, caster = ns.Requests, WM.caster
+	local function parse(t) return R.Parse(caster, t) end
+	local k, v = parse("!bom")
+	check("Paladin: !bom asks for Might", k == "set" and v == "MIGHT")
+	k, v = parse("  !BoW please")
+	check("...case and trailing words don't matter", k == "set" and v == "WISDOM")
+	k, v = parse("!buff kings")
+	check("...an optional 'buff' word is allowed (!buff kings)", k == "set" and v == "KINGS")
+	check("!none and !default", parse("!none") == "none" and parse("!default") == "clear" and parse("!clear") == "clear")
+	check("ordinary talk is not a request", parse("bom pls") == nil and parse("hello !bom") == nil and parse("!") == nil and parse("!zzz") == nil)
+	check("a secret / non-string text is not a request", R.Parse(caster, SECRET) == nil and R.Parse(caster, nil) == nil)
+	check("the announce lists every blessing's first word", R.AnnounceText(caster):find("!bom !bow !bok !bos !bol", 1, true) ~= nil and #R.AnnounceText(caster) < 255)
+	local mageWM = load({ class = "MAGE" })
+	check("Mage: !ai asks for Arcane Intellect, !amp for Amplify", select(2, R.Parse(mageWM.caster, "!ai")) == "INTELLECT" and select(2, R.Parse(mageWM.caster, "!amp")) == "AMPLIFY")
+
+	-- off by default: nothing is listened to
+	local f = ns.requestFrame
+	check("off by default: no chat is listened to", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY)) and WM.db.requests.enabled == false)
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bok", "Brakka", "", "", "", "", 0, 0, "", 0, 1, "Player-brakka")
+	check("...and a request that arrives anyway is ignored", R.Count(R.List()) == 0)
+	WM.db.requests.enabled = true; WM:ApplyRequests()
+	check("on: it listens to whispers, Battle.net whispers, party and raid", f.events.CHAT_MSG_WHISPER and f.events.CHAT_MSG_BN_WHISPER and f.events.CHAT_MSG_PARTY and f.events.CHAT_MSG_RAID_LEADER)
+
+	-- storing
+	W.guidClass = { ["Player-brakka"] = "WARRIOR" }
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bok", "Brakka-Realm", "", "", "", "", 0, 0, "", 0, 1, "Player-brakka")
+	local req = R.List()["Player-brakka"]
+	check("a party request is stored by guid with name (realm stripped) and class", req and req.buff == "KINGS" and req.name == "Brakka" and req.class == "WARRIOR")
+	check("...and it is announced to you", printed(W, "Brakka asked for: Blessing of Kings"))
+	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bom", "Brakka", "", "", "", "", 0, 0, "", 0, 2, "Player-brakka")
+	check("a whisper changes it", R.List()["Player-brakka"].buff == "MIGHT")
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!none", "Brakka", "", "", "", "", 0, 0, "", 0, 3, "Player-brakka")
+	check("!none stores 'no buff'", R.List()["Player-brakka"].buff == "NONE")
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!default", "Brakka", "", "", "", "", 0, 0, "", 0, 4, "Player-brakka")
+	check("!default clears it", R.List()["Player-brakka"] == nil)
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bom", SECRET, "", "", "", "", 0, 0, "", 0, 5, "Player-x")
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bom", "Ann", "", "", "", "", 0, 0, "", 0, 6, SECRET)
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", SECRET, "Ann", "", "", "", "", 0, 0, "", 0, 7, "Player-ann")
+	check("hidden sender / guid / text (a chat lockdown) is ignored, with a log line", R.Count(R.List()) == 0 and table.concat(ns.LogLines(), "\n"):find("request ignored", 1, true) ~= nil)
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bok", "Tek", "", "", "", "", 0, 0, "", 0, 8, "Player-Tek")
+	check("your own line (an echo of the announce) is ignored", R.Count(R.List()) == 0)
+
+	-- it changes who gets what
+	WM.db.party.assign = { WARRIOR = "WISDOM" }
+	addUnit(W, "party1", { class = "WARRIOR", guid = "Player-brakka", name = "Brakka", dist = 10, inRange = true })
+	W.groupSize = 1
+	local function pickFor()
+		local cands = ns.Discovery.Discover()
+		local ctx = { now = W.now, settings = WM.db, caster = caster, probe = ns.Probe, requests = R.Active() }
+		local best, skipped = ns.Select.Pick(cands, ctx)
+		return best, skipped
+	end
+	WM.db.self.enabled = false
+	W.spells["Blessing of Kings"] = 20217; W.known[20217] = true
+	local best = pickFor()
+	check("without a request the class default is used (Wisdom)", best and best.cand.key == "Player-brakka" and best.buff.key == "WISDOM")
+	R.Set(R.List(), "Player-brakka", "Brakka", "WARRIOR", "KINGS", 1)
+	best = pickFor()
+	check("a request replaces it (Kings)", best and best.buff.key == "KINGS")
+	R.Set(R.List(), "Player-brakka", "Brakka", "WARRIOR", "NONE", 1)
+	local best2, skipped = pickFor()
+	local why
+	for _, s in ipairs(skipped) do if s.cand.key == "Player-brakka" then why = s.reason end end
+	check("!none means nobody is picked for them, and says why", best2 == nil and why and why:find("asked for no buff", 1, true) ~= nil)
+	R.Set(R.List(), "Player-brakka", "Brakka", "WARRIOR", "KINGS", 1)
+	WM.db.requests.enabled = false
+	best = pickFor()
+	check("switching the feature off ignores saved requests (Wisdom again) but keeps them", best and best.buff.key == "WISDOM" and R.Count(R.List()) == 1)
+	WM.db.requests.enabled = true
+	R.Set(R.List(), "Player-brakka", "Brakka", "WARRIOR", "BOGUS", 1)
+	best = pickFor()
+	check("an unknown buff key in a saved request falls back to the class default", best and best.buff.key == "WISDOM")
+
+	-- per caster class, survives like the other settings, clearing
+	check("requests are kept per caster class", WM.db.requests.list.PALADIN ~= nil and WM.db.requests.list.MAGE == nil)
+	WM:RequestsCommand("")
+	check("/wellmet requests lists them", printed(W, "Buff requests (beta) are ON: 1 saved") and printed(W, "Brakka (WARRIOR)"))
+	WM:RequestsCommand("clear")
+	check("/wellmet requests clear forgets them all", R.Count(R.List()) == 0)
+	check("the report has a Buff requests section", WM:BuildReport():find("== Buff requests (beta)", 1, true) ~= nil)
+
+	-- announce
+	W.sentChat = nil
+	WM.db.requests.enabled = false
+	WM:Announce()
+	check("announce while the feature is off says to turn it on and sends nothing", W.sentChat == nil and printed(W, "Turn on 'Listen for buff requests (beta)'"))
+	WM.db.requests.enabled = true
+	W.groupSize = 0
+	WM:Announce()
+	check("announce outside a group sends nothing", W.sentChat == nil and printed(W, "not in a group"))
+	W.groupSize = 3
+	WM:Announce()
+	check("in a party it goes to PARTY", W.sentChat and W.sentChat[1].channel == "PARTY" and W.sentChat[1].msg:find("!bom", 1, true) ~= nil)
+	W.raid = true; W.sentChat = nil
+	WM:Announce()
+	check("in a raid it goes to RAID", W.sentChat[1].channel == "RAID")
+	W.instanceGroup = true; W.sentChat = nil
+	WM:Announce()
+	check("in an instance group it goes to INSTANCE_CHAT", W.sentChat[1].channel == "INSTANCE_CHAT")
+	W.chatLockdown = true; W.sentChat = nil
+	WM:Announce()
+	check("during a chat lockdown it sends nothing and says why", W.sentChat == nil and printed(W, "Can't announce right now"))
+	W.chatLockdown = false
+
+	-- minimap clicks
+	local mm = E.g.WellMetMinimap
+	local logOpened, optionsOpened
+	WM.ShowLog = function() logOpened = true end
+	WM.OpenOptions = function() optionsOpened = true end
+	WM.db.strip.enabled = false
+	W.sentChat = nil
+	mm.scripts.OnClick(mm, "RightButton")
+	check("minimap right-click shows the reminder icons", WM.db.strip.enabled == true)
+	mm.scripts.OnClick(mm, "RightButton")
+	check("...and hides them again", WM.db.strip.enabled == false)
+	mm.scripts.OnClick(mm, "LeftButton")
+	check("minimap left-click opens the settings", optionsOpened == true)
+	E.g.IsShiftKeyDown = function() return true end
+	mm.scripts.OnClick(mm, "LeftButton")
+	check("minimap Shift-click opens the log", logOpened == true)
+	E.g.IsShiftKeyDown = function() return false end
+	E.g.IsControlKeyDown = function() return true end
+	mm.scripts.OnClick(mm, "LeftButton")
+	check("minimap Ctrl-click announces", W.sentChat and W.sentChat[1].channel == "INSTANCE_CHAT")
+	E.g.IsControlKeyDown = function() return false end
+
+	-- settings page
+	check("the settings page has the beta checkbox and both buttons", E.g.WellMetAnnounceButton ~= nil and E.g.WellMetClearRequestsButton ~= nil
+		and readFile("UI/Options.lua"):find("Listen for buff requests (beta)", 1, true) ~= nil)
 end
 
 print(string.format("\n%d passed, %d failed", passes, failures))

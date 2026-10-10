@@ -10,6 +10,7 @@ Layout:
   Core/Spells.lua     spell/aura/range/distance probes (the only place that touches those APIs)
   Core/Discovery.lua  who is around: you, group, target, friendly nameplates
   Core/Select.lua     pure selection logic + "just tried" memory (unit-tested headless)
+  Core/Requests.lua   (beta) buff requests read from chat, remembered per player; the announce
   Core/Cast.lua       the secure button, PreClick pick, keybind, cast feedback
   Core/Debug.lua      /wellmet log: copyable state dump + event log
   UI/Options.lua      Settings panel
@@ -121,6 +122,7 @@ function WM:PLAYER_LOGIN()
 	WM:CreateMinimap()
 	WM:CreateStrip()
 	WM:ApplyChatProbe()
+	WM:ApplyRequests()
 
 	WM:RegisterEvent("SPELLS_CHANGED")
 	WM:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -165,14 +167,16 @@ function WM:SetupSlash()
 			local section = (command == "raid") and "party" or command
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
 		elseif command == "strip" then
-			WM.db.strip.enabled = not WM.db.strip.enabled
-			WM:ApplyStrip()
-			WM:Print("reminder strip: " .. (WM.db.strip.enabled and "ON (Shift-drag to move it)" or "OFF"))
-			if WM.refreshOptions then WM.refreshOptions() end
+			local on = WM:ToggleStrip()
+			WM:Print("reminder strip: " .. (on and "ON (Shift-drag to move it)" or "OFF"))
+		elseif command == "announce" then
+			WM:Announce()
+		elseif command == "requests" then
+			WM:RequestsCommand(arg)
 		elseif command == "macro" then
 			WM:CreateMacro()
 		else
-			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | strip | forget | debug  (set the key under Key Bindings > WellMet)")
+			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | strip | announce | requests (clear) | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
 		end
 	end

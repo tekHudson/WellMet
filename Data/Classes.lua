@@ -21,6 +21,7 @@ ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 --   order      = display/cycle order of the keys
 --   mode       = "assign": one buff per TARGET class, chosen in settings (Paladin blessings).
 --                "stack":  several buffs per target, each switched on/off per target class (Mage).
+--   tags      = the words a player can ask for it with in chat (!bom, !fort ...), first one is the one the announce shows (Core/Requests.lua)
 --   partyOnly = true: the spell works on "party member"s only, so strangers are never offered it.
 --   stack buffs also carry: defaultClasses (target classes it is ON for by default) and exclusive (the buff it replaces, so only one of the two can be on for a class).
 --   selfCategories = the caster's OWN buffs, one choice per category (an aura, an armor), cast on yourself
@@ -41,12 +42,12 @@ ns.CasterData = {
 		-- partyOnly: the spell says "party member", so it is never offered for strangers.
 		order = { "MIGHT", "WISDOM", "KINGS", "SALVATION", "LIGHT" },
 		buffs = {
-			MIGHT  = { key = "MIGHT",  name = "Blessing of Might",  alt = { "Greater Blessing of Might" },  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice" },
-			WISDOM = { key = "WISDOM", name = "Blessing of Wisdom", alt = { "Greater Blessing of Wisdom" }, icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom" },
-			KINGS  = { key = "KINGS",  name = "Blessing of Kings",  alt = { "Greater Blessing of Kings" },  icon = "Interface\\Icons\\Spell_Magic_MageArmor" },
-			SALVATION = { key = "SALVATION", name = "Blessing of Salvation", alt = { "Greater Blessing of Salvation" }, partyOnly = true,
+			MIGHT  = { key = "MIGHT", tags = { "bom", "might" },  name = "Blessing of Might",  alt = { "Greater Blessing of Might" },  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice" },
+			WISDOM = { key = "WISDOM", tags = { "bow", "wisdom" }, name = "Blessing of Wisdom", alt = { "Greater Blessing of Wisdom" }, icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom" },
+			KINGS  = { key = "KINGS", tags = { "bok", "kings" },  name = "Blessing of Kings",  alt = { "Greater Blessing of Kings" },  icon = "Interface\\Icons\\Spell_Magic_MageArmor" },
+			SALVATION = { key = "SALVATION", tags = { "bos", "salvation", "salv" }, name = "Blessing of Salvation", alt = { "Greater Blessing of Salvation" }, partyOnly = true,
 			              icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation" },
-			LIGHT  = { key = "LIGHT",  name = "Blessing of Light",  alt = { "Greater Blessing of Light" },  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
+			LIGHT  = { key = "LIGHT", tags = { "bol", "light" },  name = "Blessing of Light",  alt = { "Greater Blessing of Light" },  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
 			DEVOTION      = { key = "DEVOTION",      selfOnly = true, name = "Devotion Aura",          icon = "Interface\\Icons\\Spell_Holy_DevotionAura" },
 			RETRIBUTION   = { key = "RETRIBUTION",   selfOnly = true, name = "Retribution Aura",       icon = "Interface\\Icons\\Spell_Holy_AuraOfLight" },
 			CONCENTRATION = { key = "CONCENTRATION", selfOnly = true, name = "Concentration Aura",     icon = "Interface\\Icons\\Spell_Holy_MindSooth" },
@@ -67,11 +68,11 @@ ns.CasterData = {
 		order = { "INTELLECT", "DAMPEN", "AMPLIFY" },
 		buffs = {
 			-- Arcane Brilliance (the group version) also counts as having it.
-			INTELLECT = { key = "INTELLECT", name = "Arcane Intellect", alt = { "Arcane Brilliance" }, defaultClasses = MANA_CLASSES,
+			INTELLECT = { key = "INTELLECT", tags = { "ai", "int", "intellect" }, name = "Arcane Intellect", alt = { "Arcane Brilliance" }, defaultClasses = MANA_CLASSES,
 			icon = "Interface\\Icons\\Spell_Holy_MagicalSentry" },
-			DAMPEN    = { key = "DAMPEN",    name = "Dampen Magic",     defaultClasses = {}, exclusive = "AMPLIFY", partyOnly = true,
+			DAMPEN    = { key = "DAMPEN", tags = { "dampen", "dm" },    name = "Dampen Magic",     defaultClasses = {}, exclusive = "AMPLIFY", partyOnly = true,
 			icon = "Interface\\Icons\\Spell_Nature_AbolishMagic" },
-			AMPLIFY   = { key = "AMPLIFY",   name = "Amplify Magic",    defaultClasses = {}, exclusive = "DAMPEN", partyOnly = true,
+			AMPLIFY   = { key = "AMPLIFY", tags = { "amplify", "amp" },   name = "Amplify Magic",    defaultClasses = {}, exclusive = "DAMPEN", partyOnly = true,
 			icon = "Interface\\Icons\\Spell_Holy_FlashHeal" },
 			ICE_ARMOR   = { key = "ICE_ARMOR",   selfOnly = true, name = "Ice Armor",   icon = "Interface\\Icons\\Spell_Frost_FrostArmor02" },
 			FROST_ARMOR = { key = "FROST_ARMOR", selfOnly = true, name = "Frost Armor", icon = "Interface\\Icons\\Spell_Frost_FrostArmor02" },
@@ -88,9 +89,9 @@ ns.CasterData = {
 		order = { "MARK", "THORNS" },
 		buffs = {
 			-- Gift of the Wild (the group version) also counts as having Mark of the Wild.
-			MARK   = { key = "MARK",   name = "Mark of the Wild", alt = { "Gift of the Wild" }, defaultClasses = ALL_CLASSES,
+			MARK   = { key = "MARK", tags = { "motw", "mark", "gotw" },   name = "Mark of the Wild", alt = { "Gift of the Wild" }, defaultClasses = ALL_CLASSES,
 			           icon = "Interface\\Icons\\Spell_Nature_Regeneration" },
-			THORNS = { key = "THORNS", name = "Thorns", defaultClasses = {}, icon = "Interface\\Icons\\Spell_Nature_Thorns" },
+			THORNS = { key = "THORNS", tags = { "thorns" }, name = "Thorns", defaultClasses = {}, icon = "Interface\\Icons\\Spell_Nature_Thorns" },
 		},
 		-- no selfCategories: Omen of Clarity is a passive in Forever (nothing to cast), and Druid forms are not buffs
 	},
@@ -100,11 +101,11 @@ ns.CasterData = {
 		order = { "FORTITUDE", "SPIRIT", "SHADOW_PROT" },
 		buffs = {
 			-- The group versions (Prayer of ...) also count as having the single-target buff.
-			FORTITUDE   = { key = "FORTITUDE", name = "Power Word: Fortitude", alt = { "Prayer of Fortitude" }, defaultClasses = ALL_CLASSES,
+			FORTITUDE   = { key = "FORTITUDE", tags = { "fort", "fortitude", "pwf" }, name = "Power Word: Fortitude", alt = { "Prayer of Fortitude" }, defaultClasses = ALL_CLASSES,
 			                icon = "Interface\\Icons\\Spell_Holy_WordFortitude" },
-			SPIRIT      = { key = "SPIRIT", name = "Divine Spirit", alt = { "Prayer of Spirit" }, defaultClasses = MANA_CLASSES,
+			SPIRIT      = { key = "SPIRIT", tags = { "spirit", "ds" }, name = "Divine Spirit", alt = { "Prayer of Spirit" }, defaultClasses = MANA_CLASSES,
 			                icon = "Interface\\Icons\\Spell_Holy_DivineSpirit" },
-			SHADOW_PROT = { key = "SHADOW_PROT", name = "Shadow Protection", alt = { "Prayer of Shadow Protection" }, defaultClasses = {},
+			SHADOW_PROT = { key = "SHADOW_PROT", tags = { "shadow", "sp" }, name = "Shadow Protection", alt = { "Prayer of Shadow Protection" }, defaultClasses = {},
 			                icon = "Interface\\Icons\\Spell_Shadow_AntiShadow" },
 			INNER_FIRE  = { key = "INNER_FIRE", selfOnly = true, name = "Inner Fire", icon = "Interface\\Icons\\Spell_Holy_InnerFire" },
 		},

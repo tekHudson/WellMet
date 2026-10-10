@@ -98,7 +98,7 @@ function WM:OnPress(b, fromMacro)
 	end
 
 	local cands, rejected, info = ns.Discovery.Discover()
-	local ctx = { now = now, settings = WM.db, caster = WM.caster, probe = ns.Probe }
+	local ctx = { now = now, settings = WM.db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
 	local best, skipped = ns.Select.Pick(cands, ctx)
 	WM.lastPick = { best = best, skipped = skipped, rejected = rejected, info = info, at = now, cands = cands }
 

@@ -21,6 +21,7 @@ local DEFAULTS = {
 	allowMounted = false,      -- refuse to cast while mounted (casting would dismount you)
 	minimap      = { hide = false, angle = 200 },   -- minimap button: hidden?, position around the minimap (degrees)
 	strip        = { enabled = false, onlyWhenMissing = false, point = "TOP", x = 0, y = -140 },   -- the Self / Group reminder strip: shown?, draw only the icons that need a buff?, where
+	requests     = { enabled = false, list = {} },   -- (beta) what players asked for in chat: list[casterClass][guid] = { buff, name, class, at }
 	debug        = false,      -- record the /wellmet log and show press-time chat messages
 	self   = { enabled = true,  choice = {}, assign = {}, stack = {} },
 	party  = { enabled = true,  radius = 0,  assign = {}, stack = {} },    -- radius 0 = the buff's own cast range, else 10 or 28 yards

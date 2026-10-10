@@ -105,7 +105,7 @@ local function before()
 	end
 end
 
--- ctx = { now, settings, caster, probe }
+-- ctx = { now, settings, caster, probe, requests }   (requests: guid -> { buff } from chat, or nil when that feature is off)
 -- cands: list of { unit, tier, key, name, class, order, ... }
 -- Returns: best (or nil), skipped = { { cand, reason, buff }, ... }, eligible (sorted).
 -- An entry is one (person, buff) pair: a stack-mode caster can have several per person.
@@ -189,6 +189,16 @@ function Select.Pick(cands, ctx)
 					skipped[#skipped + 1] = { cand = cand, reason = why }
 				end
 			end
+		end
+		-- (beta) a player who asked for a buff in chat gets that one instead of their class default
+		local req = ctx.requests and cand.tier ~= 0 and cand.guid and ctx.requests[cand.guid]
+		if req then
+			if req.buff == "NONE" then
+				skipped[#skipped + 1] = { cand = cand, reason = "asked for no buff (!none)" }
+				return
+			end
+			local want = ctx.caster.buffs[req.buff]
+			if want and not want.selfOnly then return add(cand, want, cfg) end
 		end
 		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, cfg)
 		if not buffs then

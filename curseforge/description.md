@@ -33,7 +33,7 @@ Tick the sections you want on the main settings page, and each one gets its own 
 2. Choose the sections and buffs you want.
 3. Optional: **Create macro** puts a `/click WellMetCast` macro on your cursor. It buffs you and your group. Strangers need the key, because the game won't run that from inside a macro.
 
-Commands: `/wellmet` (settings), `/wellmet self`, `party`, `others`, `/wellmet macro`, `/wellmet strip`, `/wellmet log`, `/wellmet debug`.
+Commands: `/wellmet` (settings), `/wellmet self`, `party`, `others`, `/wellmet macro`, `/wellmet strip`, `/wellmet announce`, `/wellmet requests`, `/wellmet log`, `/wellmet debug`.
 
 ## Good to know
 

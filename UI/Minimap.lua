@@ -1,7 +1,7 @@
 --[[ WellMet — minimap button (native, no libraries).
 
-Left-click opens the settings, right-click opens the copyable log, drag moves it around the
-minimap. The icon is Icons/Icon.tga: "WM" in IM Fell English SC (SIL OFL), antiqued gold on dark
+Left-click opens the settings, right-click shows / hides the reminder icons, Ctrl-click announces how to
+request a buff, Shift-click opens the copyable log, drag moves it around the minimap. The icon is Icons/Icon.tga: "WM" in IM Fell English SC (SIL OFL), antiqued gold on dark
 grey, 128x128.
 ]]
 
@@ -38,7 +38,11 @@ function WM:CreateMinimap()
 	reposition()
 
 	b:SetScript("OnClick", function(_, button)
-		if button == "RightButton" then WM:ShowLog() else WM:OpenOptions() end
+		if IsShiftKeyDown() then WM:ShowLog()
+		elseif IsControlKeyDown() then WM:Announce()
+		elseif button == "RightButton" then
+			WM:Print("reminder strip: " .. (WM:ToggleStrip() and "ON" or "OFF"))
+		else WM:OpenOptions() end
 	end)
 	b:RegisterForDrag("LeftButton")
 	b:SetScript("OnDragStart", function()
@@ -58,7 +62,9 @@ function WM:CreateMinimap()
 		local key = GetBindingKey(ns.CLICK_ACTION)
 		GameTooltip:AddLine(key and ("Key: " .. key) or "No key bound (Key Bindings > WellMet)", 1, 1, 1)
 		GameTooltip:AddLine("Left-click: settings", 1, 1, 1)
-		GameTooltip:AddLine("Right-click: log", 1, 1, 1)
+		GameTooltip:AddLine("Right-click: show / hide the reminder icons", 1, 1, 1)
+		GameTooltip:AddLine("Ctrl-click: announce how to request a buff", 1, 1, 1)
+		GameTooltip:AddLine("Shift-click: log", 1, 1, 1)
 		GameTooltip:Show()
 	end)
 	b:SetScript("OnLeave", function() GameTooltip:Hide() end)

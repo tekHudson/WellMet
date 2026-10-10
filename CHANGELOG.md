@@ -6,6 +6,14 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- Buff requests (beta; settings > Buff requests, off by default): players say `!bom`, `!bow`, `!fort`, `!ai` ... (or `!none`,
+  `!default`) in party or raid chat, or whisper it to you, and the key buffs them with that instead of their class default.
+  Requests are remembered per player (and per caster class) until they change it or you clear it (`/wellmet requests clear`,
+  or the Clear requests button). Switching the setting off stops listening and ignores saved requests. Chat is hidden by the
+  game during encounters, Mythic+ and PvP, so new requests only arrive outside them.
+- Announce how to ask: the Announce to group button, `/wellmet announce` or Ctrl-click on the minimap button posts the request
+  words to party / raid / instance chat (only when you ask, and not during a chat lockdown).
+- `/wellmet requests` lists the saved requests; the log report has a Buff requests section.
 - Debug chat probe: while debug is on, the log records whether WellMet could read each whisper, Battle.net whisper,
   party, raid and raid warning message (text, sender and guid readable or secret, text length, whether it began with
   "!", and the chat-lockdown state). It never records what was said or who said it. `/wellmet log` has a "Chat reading"
@@ -19,15 +27,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   when everyone is covered, and shows a grey ? when the game hides buffs (combat). An icon whose section is switched
   off is not drawn. "Show only when a buff is missing" draws an icon only while it needs one. Shift-drag to move it.
   Off by default.
-- "Set all classes" on the Party / Raid and Others pages: one icon per buff above the class table. Click a blessing (Paladin)
-  to give it to every class, or click it again to clear them all; the red cross skips every class, and Others has a second
-  row for the fallback blessing. For Mage, Druid and Priest an icon adds that buff to every class, or removes it when they
-  all have it. A count like 4/9 shows when only some classes match, and you can still change any single class afterwards.
-- An optional reminder strip (settings > Buff reminder, or `/wellmet strip`): three small chips, Self / Party / Raid, that show
-  how many people the key would buff right now. Orange with a count means someone needs a buff, a check means everyone is
-  covered, a grey "?" means the game is hiding buffs (combat). Party is your own party, Raid is the rest of your raid.
-  Shift-drag to move it. Off by default.
 ### Changed
+- Minimap button: right-click now shows / hides the reminder icons; the log moved to Shift-click.
 - Someone out of line of sight is skipped for 5 seconds, the same as out of range (was 20, and 60 on a repeat).
 
 ## [1.0.0] - 2026-10-07

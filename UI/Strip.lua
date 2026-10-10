@@ -37,7 +37,7 @@ function ns.StripModel()
 	local people = { self = {}, group = {} }
 	if readable then
 		local cands = ns.Discovery.Discover({ groupOnly = true })
-		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe }
+		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
 		local _, _, eligible = ns.Select.Pick(cands, ctx)
 		for _, e in ipairs(eligible) do
 			people[e.cand.tier == 0 and "self" or "group"][e.cand.key] = true
@@ -175,6 +175,14 @@ function WM:ApplyStrip()
 		driver:Hide()
 		strip:Hide()
 	end
+end
+
+-- Flip the strip on / off (/wellmet strip and the minimap button's right-click). Returns the new state.
+function WM:ToggleStrip()
+	WM.db.strip.enabled = not WM.db.strip.enabled
+	WM:ApplyStrip()
+	if WM.refreshOptions then WM.refreshOptions() end
+	return WM.db.strip.enabled
 end
 
 function WM:ResetStripPosition()

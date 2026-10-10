@@ -540,6 +540,22 @@ local function buildMainPanel(subs)
 		function(v) WM.db.strip.onlyWhenMissing = v and true or false; WM:RefreshStrip() end)
 	makeButton(panel, "Reset position", 130, 24, y, function() WM:ResetStripPosition() end, "WellMetStripResetButton")
 	makeText(panel, "Shift-drag the icons to move them.", 164, y - 5)
+
+	-- (beta) players ask for their buff in chat; WellMet remembers it
+	y = y - 44
+	makeHeader(panel, "Buff requests (beta)", 16, y); y = y - 28
+	check("Listen for buff requests (beta)", function() return WM.db.requests.enabled end,
+		function(v) WM.db.requests.enabled = v and true or false; WM:ApplyRequests() end)
+	makeText(panel, "Players say !" .. WM.caster.buffs[WM.caster.order[1]].tags[1] .. ", !none or !default in party / raid chat or whisper you, and the key buffs them with that "
+		.. "instead of their class default. Remembered until they change it or you clear it. Chat is hidden during encounters, Mythic+ and PvP, so "
+		.. "new requests only arrive outside them.", 24, y)
+	y = y - 50
+	makeButton(panel, "Announce to group", 150, 24, y, function() WM:Announce() end, "WellMetAnnounceButton")
+	makeButton(panel, "Clear requests", 130, 182, y, function() WM:ClearRequests() end, "WellMetClearRequestsButton")
+	local countText = makeText(panel, "", 322, y - 5)
+	panel.refreshers[#panel.refreshers + 1] = function()
+		countText:SetText(ns.Requests.Count(ns.Requests.List()) .. " saved")
+	end
 	return panel
 end
 
