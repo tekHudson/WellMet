@@ -80,6 +80,7 @@ local function newEnv(W)
 	g.IsInRaid = function() return W.raid end
 
 	g.GetNumGroupMembers = function() return W.groupSize end
+	g.C_ChatInfo = { InChatMessagingLockdown = function() return W.chatLockdown or false end }
 	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
@@ -1443,7 +1444,7 @@ do
 	local WM, ns, E, W = load()
 	local ev
 	for _, f in ipairs(E.frames) do
-		if rawget(f, "scripts") and f.scripts.OnEvent and f ~= ns.castFrame and rawget(f, "name") == nil then ev = f end
+		if rawget(f, "scripts") and f.scripts.OnEvent and f ~= ns.castFrame and f ~= ns.chatFrame and rawget(f, "name") == nil then ev = f end
 	end
 	check("the raw cast-event logger frame exists", ev ~= nil)
 	local names = { [585] = "Smite", [19834] = "Blessing of Might", [8613] = "Skinning" }
@@ -1750,6 +1751,37 @@ do
 	-- the settings pages carry the section
 	local src = readFile("UI/Options.lua")
 	check("both group pages build the Set all section above the class table", select(2, src:gsub("buildSetAll%(panel, \"", "")) == 2)
+end
+
+----------------------------------------------------------------------
+print("== Chat probe (debug)")
+do
+	local WM, ns, E, W = load()
+	local f = ns.chatFrame
+	local function listening() return f.events and f.events.CHAT_MSG_WHISPER and f.events.CHAT_MSG_PARTY and f.events.CHAT_MSG_RAID_WARNING and f.events.CHAT_MSG_BN_WHISPER end
+	check("debug on (set by the harness): the probe listens after the next toggle", true)
+	WM.db.debug = false; WM:ApplyChatProbe()
+	check("debug off: the probe listens to no chat at all", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY or f.events.CHAT_MSG_RAID)))
+	WM:ToggleDebug()
+	check("turning debug on starts listening to whispers, Battle.net whispers, party, raid and raid warnings", listening() and WM.db.debug)
+	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!buff none", "Brakka", "", "", "", "", 0, 0, "", 0, 1, "Player-1")
+	local log = table.concat(ns.LogLines(), "\n")
+	check("a readable party message logs readable text, its length and the leading !", log:find("chat CHAT_MSG_PARTY text=readable len=10 starts-with-! sender=readable guid=readable", 1, true) ~= nil)
+	check("...and never the words or the name", not log:find("buff none", 1, true) and not log:find("Brakka", 1, true))
+	W.chatLockdown = true
+	f.scripts.OnEvent(f, "CHAT_MSG_RAID", E.g.issecretvalue and SECRET, SECRET, "", "", "", "", 0, 0, "", 0, 2, SECRET)
+	log = table.concat(ns.LogLines(), "\n")
+	check("a secret raid message logs SECRET for text, sender and guid, with the lockdown state", log:find("chat CHAT_MSG_RAID text=SECRET sender=SECRET guid=SECRET lockdown=true", 1, true) ~= nil)
+	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "hello", "Someone", "", "", "", "", 0, 0, "", 0, 3, SECRET)
+	log = table.concat(ns.LogLines(), "\n")
+	check("a whisper with a secret guid but readable text is logged that way", log:find("chat CHAT_MSG_WHISPER text=readable len=5 sender=readable guid=SECRET", 1, true) ~= nil)
+	local report = WM:BuildReport()
+	check("the report counts what could be read per channel", report:find("CHAT_MSG_PARTY", 1, true) and report:find("1 seen: text readable 1, sender readable 1, guid readable 1", 1, true)
+		and report:find("CHAT_MSG_RAID ", 1, true) and report:find("1 seen: text readable 0, sender readable 0, guid readable 0", 1, true) ~= nil)
+	ns.ClearLog()
+	check("clearing the log clears the chat counts", WM:BuildReport():find("no chat messages seen yet", 1, true) ~= nil)
+	WM:ToggleDebug()
+	check("turning debug off stops listening", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY)))
 end
 
 print(string.format("\n%d passed, %d failed", passes, failures))

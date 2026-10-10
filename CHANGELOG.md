@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- Debug chat probe: while debug is on, the log records whether WellMet could read each whisper, Battle.net whisper,
+  party, raid and raid warning message (text, sender and guid readable or secret, text length, whether it began with
+  "!", and the chat-lockdown state). It never records what was said or who said it. `/wellmet log` has a "Chat reading"
+  section with per-channel counts. Nothing is listened to while debug is off.
 - "Set all classes" on the Party / Raid and Others pages: one icon per buff above the class table. Click a blessing (Paladin)
   to give it to every class, or click it again to clear them all; the red cross skips every class, and Others has a second
   row for the fallback blessing. For Mage, Druid and Priest an icon adds that buff to every class, or removes it when they

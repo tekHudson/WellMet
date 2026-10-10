@@ -72,6 +72,7 @@ end
 -- Turn debug on / off (the slash command and the settings button both use this). Returns the new state.
 function WM:ToggleDebug()
 	WM.db.debug = not WM.db.debug
+	WM:ApplyChatProbe()
 	WM:Log("debug turned on")          -- only recorded when it is on
 	return WM.db.debug
 end
@@ -119,6 +120,7 @@ function WM:PLAYER_LOGIN()
 	WM:CreateOptions()
 	WM:CreateMinimap()
 	WM:CreateStrip()
+	WM:ApplyChatProbe()
 
 	WM:RegisterEvent("SPELLS_CHANGED")
 	WM:RegisterEvent("NAME_PLATE_UNIT_ADDED")

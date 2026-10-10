@@ -48,6 +48,51 @@ evFrame:SetScript("OnEvent", function(_, event, ...)
 end)
 
 ----------------------------------------------------------------------
+-- Chat probe: can WellMet read whispers, party and raid chat? (debug only)
+--   Forever makes chat text, sender and guid secret during chat messaging lockdown (encounters, Mythic+, PvP,
+--   dungeon / raid maps). This listens ONLY while debug is on and logs what could be read for each message, so a
+--   chat feature can be designed from facts. It never records what anyone said: only whether the text, the sender
+--   and the guid were readable, how long the text was, and whether it began with "!".
+----------------------------------------------------------------------
+local CHAT_EVENTS = { "CHAT_MSG_WHISPER", "CHAT_MSG_BN_WHISPER", "CHAT_MSG_PARTY", "CHAT_MSG_PARTY_LEADER",
+	"CHAT_MSG_RAID", "CHAT_MSG_RAID_LEADER", "CHAT_MSG_RAID_WARNING" }
+local chatStats = {}                 -- event -> { seen, text, sender, guid }: how many messages, and how many parts were readable
+local chatFrame = CreateFrame("Frame")
+ns.chatFrame = chatFrame
+
+local function readable(v) return v ~= nil and not issecretvalue(v) end
+
+chatFrame:SetScript("OnEvent", function(_, event, text, sender, ...)
+	local guid = select(10, ...)                     -- text, sender, then language, channel, target, flags, zone id, index, base name, language id, line id, guid
+	local textOk, senderOk, guidOk = readable(text), readable(sender), readable(guid)
+	local st = chatStats[event] or { seen = 0, text = 0, sender = 0, guid = 0 }
+	chatStats[event] = st
+	st.seen = st.seen + 1
+	if textOk then st.text = st.text + 1 end
+	if senderOk then st.sender = st.sender + 1 end
+	if guidOk then st.guid = st.guid + 1 end
+	local what = "SECRET"
+	if textOk then
+		what = "readable len=" .. #text .. (text:sub(1, 1) == "!" and " starts-with-!" or "")
+	end
+	WM:Log("chat", event, "text=" .. what, "sender=" .. (senderOk and "readable" or "SECRET"), "guid=" .. (guidOk and "readable" or "SECRET"),
+		"lockdown=" .. S(C_ChatInfo.InChatMessagingLockdown()), "combat=" .. yn(InCombatLockdown()))
+end)
+
+-- Listen to chat only while debug is on (called at login and whenever debug is switched).
+function WM:ApplyChatProbe()
+	for _, e in ipairs(CHAT_EVENTS) do
+		if WM.db.debug then chatFrame:RegisterEvent(e) else chatFrame:UnregisterEvent(e) end
+	end
+end
+
+local clearLog = ns.ClearLog
+function ns.ClearLog()
+	clearLog()
+	for k in pairs(chatStats) do chatStats[k] = nil end
+end
+
+----------------------------------------------------------------------
 -- Report sections
 ----------------------------------------------------------------------
 local function section(out, title, fn)
@@ -88,6 +133,20 @@ function WM:BuildReport()
 			local buff = WM.caster.buffs[key]
 			add(string.format("buff %-14s %-24s id=%s known=%s", key, buff.name, S(ns.SpellId(buff)), yn(ns.IsKnown(buff))))
 		end
+	end)
+
+	section(out, "Chat reading (debug probe: whispers, party, raid)", function(add)
+		add(string.format("chat messaging lockdown right now: %s   (the probe only listens while debug is ON: %s)",
+			S(C_ChatInfo.InChatMessagingLockdown()), yn(db.debug)))
+		local any
+		for _, e in ipairs(CHAT_EVENTS) do
+			local st = chatStats[e]
+			if st then
+				any = true
+				add(string.format("  %-24s %d seen: text readable %d, sender readable %d, guid readable %d", e, st.seen, st.text, st.sender, st.guid))
+			end
+		end
+		if not any then add("  no chat messages seen yet. With debug on, send yourself a whisper or say something in party / raid, then reopen this.") end
 	end)
 
 	section(out, "Right now (what a key press would see)", function(add)
