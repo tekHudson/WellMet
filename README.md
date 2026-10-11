@@ -2,7 +2,7 @@
 
 One key buffs the next nearby player who needs it. Built for **WoW Forever** (Interface 16001).
 
-> Version 1.0.0. It only works on the WoW Forever client (Interface 16001).
+> Version 1.1.0. It only works on the WoW Forever client (Interface 16001).
 
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.
@@ -26,16 +26,32 @@ all: no messages, no settings, no minimap button. A single self buff is better s
   just this if the other two are off), **Party / Raid** and **Others** (strangers, off until you turn it on; found
   through friendly nameplates and needs the key). Tick a section on the main page to switch it on and show its
   page under WellMet; untick it and the page goes away. `/wellmet self`, `party` and `others` open each one. The main page has a button that writes the macro for you (`/wellmet macro`).
+- **Set all classes**: on the Party / Raid and Others pages, an icon per buff sits above the class table. Click one to give
+  that buff to every class, click it again to clear them all (the red cross skips every class). A count like 4/9 shows when
+  only some classes match, and you can still change a single class afterwards.
+- **Buff reminder** (main page, off by default): two small icons, **Self** and **Group** (party and raid together). An
+  icon glows gold when the key would buff someone in it, goes dark with a green check when everyone is covered, and shows
+  a grey ? when the game hides buffs (combat). "Show only when a buff is missing" draws an icon only while it needs one.
+  Shift-drag moves them; `/wellmet strip` toggles them.
+- **Buff requests (beta)** (main page, off by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
+  `!dampen`, `!amp` (Mage), `!motw`, `!thorns` (Druid) or `!fort`, `!spirit`, `!shadow` (Priest) in party or raid chat, or
+  whisper it to you, and the key buffs them with that instead of their class default. `!none` means no buff from you and
+  `!default` resets. Requests are remembered per player (and per caster class) until they change it or you clear it
+  (*Clear requests*, or `/wellmet requests clear`; `/wellmet requests` lists them). The game hides chat during encounters,
+  Mythic+ and PvP matches, so new requests only arrive outside them. *Announce to group* (button, `/wellmet announce` or
+  Ctrl-click on the minimap button) tells the group how to ask. Where the game doesn't let addons send chat, the line is
+  put in your chat box and you press Enter.
+- **Minimap button**: left-click settings, right-click show / hide the reminder icons, Ctrl-click announce, Shift-click the log.
 - Macro: `/click WellMetCast` buffs you and your group. **Strangers need the bound key**: the game won't run the
   targeting macro WellMet uses for them from inside another macro.
 - WellMet is quiet by default. If a press does nothing and you want to know why, turn on `/wellmet debug`: it
   shows messages like "Nobody nearby needs ..." and records the log that `/wellmet log` shows.
-- `/wellmet` (or `/well`, `/wmet`) settings · `/wellmet log` copyable report · `/wellmet forget` · `/wellmet debug`
+- `/wellmet` (or `/well`, `/wmet`) settings · `/wellmet strip` · `/wellmet announce` · `/wellmet requests` · `/wellmet log` copyable report · `/wellmet forget` · `/wellmet debug`
 
 ## How it picks
 
 You first, then your group, then everyone else (your target and friendly nameplates), nearest first.
-It skips people who already have the buff, are out of range, dead, or that it just tried.
+It skips people who already have the buff, are out of range, dead, or that it just tried. A player who asked for a buff in chat gets that one instead of their class default.
 Players outside your group are only found through **friendly player nameplates** (the settings panel
 has a button to turn them on).
 
