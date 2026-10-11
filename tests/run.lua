@@ -86,6 +86,7 @@ local function newEnv(W)
 	g.IsInGroup = function(cat) if cat then return W.instanceGroup or false end return W.groupSize > 0 end
 	g.GetPlayerInfoByGUID = function(guid) return nil, (W.guidClass or {})[guid] end
 	g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
+	g.ChatFrame_OpenChat = function(text) W.chatBox = text end
 	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
 	g.IsAltKeyDown = function() return false end
 	g.IsControlKeyDown = function() return false end
@@ -1900,6 +1901,14 @@ do
 	W.chatLockdown = true; W.sentChat = nil
 	WM:Announce()
 	check("during a chat lockdown it sends nothing and says why", W.sentChat == nil and printed(W, "Can't announce right now"))
+	check("...and puts the line in the chat box for you to send", W.chatBox and W.chatBox:find("/i WellMet:", 1, true) == 1 and W.chatBox:find("!bom", 1, true) ~= nil)
+	W.chatBox = nil
+	E.g.C_ChatInfo.AreOutgoingAddonChatMessagesRestricted = function() return true end
+	W.chatLockdown = false; W.sentChat = nil
+	WM:Announce()
+	check("a realm that never lets addons send chat: nothing is sent, the line is in the chat box", W.sentChat == nil and W.chatBox ~= nil)
+	E.g.C_ChatInfo.AreOutgoingAddonChatMessagesRestricted = nil
+	W.chatBox = nil
 	W.chatLockdown = false
 	E.g.SendChatMessage = function() error("blocked") end
 	W.sentChat = nil

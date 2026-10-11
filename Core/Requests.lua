@@ -150,8 +150,16 @@ function WM:Announce()
 	local outgoing = C_ChatInfo.AreOutgoingAddonChatMessagesRestricted and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()
 	WM:Log("announce: channel=" .. channel .. " lockdown=" .. ns.SafeStr(lockdown) .. " outgoingRestricted=" .. ns.SafeStr(outgoing))
 	if lockdown or outgoing then
-		WM:Print("Can't announce right now: the game blocks addon chat during an encounter, Mythic+ or a PvP match.")
-		WM:Log("announce: refused by the lockdown flags")
+		-- The game does not let an addon send chat here (this realm, or an encounter / Mythic+ / PvP match). Respect that:
+		-- put the line in your chat box instead, and you press Enter, which the game allows.
+		local slash = ({ PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i " })[channel]
+		WM:Log("announce: addon chat is blocked, so the line goes into your chat box instead")
+		if ChatFrame_OpenChat then
+			ChatFrame_OpenChat(slash .. Requests.AnnounceText(WM.caster))
+			WM:Print("Can't announce right now: the game doesn't let addons send chat here. The line is in your chat box: press Enter to send it.")
+		else
+			WM:Print("Can't announce right now: the game doesn't let addons send chat here. Type this yourself: " .. slash .. Requests.AnnounceText(WM.caster))
+		end
 		return false
 	end
 	local send = C_ChatInfo.SendChatMessage or SendChatMessage

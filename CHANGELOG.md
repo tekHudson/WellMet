@@ -12,7 +12,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   or the Clear requests button). Switching the setting off stops listening and ignores saved requests. Chat is hidden by the
   game during encounters, Mythic+ and PvP, so new requests only arrive outside them.
 - Announce how to ask: the Announce to group button, `/wellmet announce` or Ctrl-click on the minimap button posts the request
-  words to party / raid / instance chat (only when you ask, and not during a chat lockdown).
+  words to party / raid / instance chat, only when you ask. Where the game does not let addons send chat (some realms, and
+  encounters, Mythic+ and PvP matches) the line is put in your chat box for you to send with Enter instead.
 - `/wellmet requests` lists the saved requests; the log report has a Buff requests section.
 - Debug chat probe: while debug is on, the log records whether WellMet could read each whisper, Battle.net whisper,
   party, raid and raid warning message (text, sender and guid readable or secret, text length, whether it began with
