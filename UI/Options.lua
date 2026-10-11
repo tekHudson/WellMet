@@ -198,16 +198,31 @@ end
 
 -- A hidden canvas panel with a title and a subtitle. Panels start hidden (a shown frame at login once
 -- locked the keyboard); the settings screen shows them. `panel.refreshers` re-read the saved values on show.
+-- The page scrolls: the settings screen gets `panel.outer` (a frame holding a stock scroll frame), and everything is
+-- built on `panel`, the tall frame inside it. Each builder ends with fitPanel(panel, y) to say how tall the content is.
 local function newPanel(globalName, displayName, title, subtitle)
-	local panel = CreateFrame("Frame", globalName, UIParent)
-	panel.name = displayName
-	panel:Hide()
+	local outer = CreateFrame("Frame", globalName, UIParent)
+	outer.name = displayName
+	outer:Hide()
+	local scroll = CreateFrame("ScrollFrame", globalName .. "Scroll", outer, "UIPanelScrollFrameTemplate")
+	scroll:SetPoint("TOPLEFT", 0, -4)
+	scroll:SetPoint("BOTTOMRIGHT", -28, 4)
+	local panel = CreateFrame("Frame", nil, scroll)
+	panel:SetSize(580, 600)
+	scroll:SetScrollChild(panel)
+	panel.outer = outer
 	panel.refreshers = {}
 	local t = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
 	t:SetPoint("TOPLEFT", 16, -16)
 	t:SetText(title)
 	makeText(panel, subtitle, 16, -44)
-	panel:SetScript("OnShow", function() for _, r in ipairs(panel.refreshers) do r() end end)
+	outer:SetScript("OnShow", function() for _, r in ipairs(panel.refreshers) do r() end end)
+	return panel
+end
+
+-- Make the scrolling content as tall as what was built (y is where the last row ended, a negative number).
+local function fitPanel(panel, y)
+	panel:SetHeight(math.max(200, 40 - y))
 	return panel
 end
 
@@ -435,7 +450,7 @@ local function buildSelfPanel(caster, subtitle)
 		y = y - 36
 	end
 
-	return panel
+	return fitPanel(panel, y)
 end
 
 local function buildPartyPanel(caster)
@@ -445,8 +460,7 @@ local function buildPartyPanel(caster)
 	y = buildRadius(panel, "party", y)
 	y = buildSetAll(panel, "party", y)
 	makeHeader(panel, caster.title, 16, y); y = y - 28
-	buildClassTable(panel, "party", y)
-	return panel
+	return fitPanel(panel, buildClassTable(panel, "party", y))
 end
 
 local function buildOthersPanel(caster)
@@ -470,8 +484,7 @@ local function buildOthersPanel(caster)
 	y = y - 40
 	y = buildSetAll(panel, "others", y)
 	makeHeader(panel, caster.title, 16, y); y = y - 28
-	buildClassTable(panel, "others", y)
-	return panel
+	return fitPanel(panel, buildClassTable(panel, "others", y))
 end
 
 local function buildMainPanel(subs)
@@ -556,7 +569,7 @@ local function buildMainPanel(subs)
 	panel.refreshers[#panel.refreshers + 1] = function()
 		countText:SetText(ns.Requests.Count(ns.Requests.List()) .. " saved")
 	end
-	return panel
+	return fitPanel(panel, y)
 end
 
 function WM:CreateOptions()
@@ -567,13 +580,13 @@ function WM:CreateOptions()
 	panels.others = buildOthersPanel(caster)
 	local main = buildMainPanel()
 
-	local category = Settings.RegisterCanvasLayoutCategory(main, "WellMet")
+	local category = Settings.RegisterCanvasLayoutCategory(main.outer, "WellMet")
 	Settings.RegisterAddOnCategory(category)
 	WM.optionsCategory = category
 	WM.optionsSub = {}
 	for _, sectionKey in ipairs(ns.SECTIONS) do
 		if panels[sectionKey] then
-			WM.optionsSub[sectionKey] = Settings.RegisterCanvasLayoutSubcategory(category, panels[sectionKey], SECTION_TITLE[sectionKey])
+			WM.optionsSub[sectionKey] = Settings.RegisterCanvasLayoutSubcategory(category, panels[sectionKey].outer, SECTION_TITLE[sectionKey])
 		end
 	end
 	WM.optionsPanel = main

@@ -1924,6 +1924,13 @@ do
 	check("minimap Ctrl-click announces", W.sentChat and W.sentChat[1].channel == "INSTANCE_CHAT")
 	E.g.IsControlKeyDown = function() return false end
 
+	-- settings pages scroll
+	check("every settings page is a stock scroll frame inside the registered frame", (function()
+		local o = readFile("UI/Options.lua")
+		return o:find("UIPanelScrollFrameTemplate", 1, true) and o:find("main.outer", 1, true) and o:find("panels[sectionKey].outer", 1, true) and select(2, o:gsub("fitPanel%(panel", "")) >= 4
+	end)() ~= nil)
+	check("the content height follows what was built", E.g.WellMetOptionsPanel ~= nil and WM.optionsPanel.outer == E.g.WellMetOptionsPanel)
+
 	-- settings page
 	check("the settings page has the beta checkbox and both buttons", E.g.WellMetAnnounceButton ~= nil and E.g.WellMetClearRequestsButton ~= nil
 		and readFile("UI/Options.lua"):find("Listen for buff requests (beta)", 1, true) ~= nil)

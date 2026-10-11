@@ -28,6 +28,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   off is not drawn. "Show only when a buff is missing" draws an icon only while it needs one. Shift-drag to move it.
   Off by default.
 ### Changed
+- The settings pages scroll, so nothing is cut off when a page is taller than the window.
 - Minimap button: right-click now shows / hides the reminder icons; the log moved to Shift-click.
 - Someone out of line of sight is skipped for 5 seconds, the same as out of range (was 20, and 60 on a repeat).
 
