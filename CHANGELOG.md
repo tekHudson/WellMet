@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.1.0] - 2026-10-11
 ### Added
 - Buff requests (beta; settings > Buff requests, off by default): players say `!bom`, `!bow`, `!fort`, `!ai` ... (or `!none`,
   `!default`) in party or raid chat, or whisper it to you, and the key buffs them with that instead of their class default.

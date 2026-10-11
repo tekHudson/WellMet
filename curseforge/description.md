@@ -27,6 +27,14 @@ The group versions (Prayer of Fortitude, Gift of the Wild, Arcane Brilliance and
 
 Tick the sections you want on the main settings page, and each one gets its own page. Every choice is an icon dropdown, and spells you haven't learned are shown greyed out with an "Unknown" tooltip.
 
+## Optional extras
+
+- **Set all classes**: on the Party / Raid and Others pages, click a buff icon to give it to every class, or click it again to clear them all.
+- **Buff reminder**: two small icons, Self and Group, that glow when someone still needs a buff. Off by default (settings, *Buff reminder*); Shift-drag to move.
+- **Buff requests (beta)**: players say `!bom`, `!fort`, `!ai` ... (or `!none`, `!default`) in party or raid chat, or whisper you, and the key buffs them with that instead of their class default. It is remembered until they change it or you clear it. Off by default. The game hides chat during encounters, Mythic+ and PvP matches, so new requests only arrive outside them. *Announce to group* (button, `/wellmet announce` or Ctrl-click on the minimap button) tells the group how to ask; where the game won't let addons send chat, the line is put in your chat box for you to send.
+- **Minimap button**: left-click settings, right-click show / hide the reminder icons, Ctrl-click announce, Shift-click log.
+- The settings pages scroll.
+
 ## Setting it up
 
 1. Open the settings, **WellMet**, and bind your key. The button jumps straight to it in Key Bindings.
