@@ -1901,6 +1901,11 @@ do
 	WM:Announce()
 	check("during a chat lockdown it sends nothing and says why", W.sentChat == nil and printed(W, "Can't announce right now"))
 	W.chatLockdown = false
+	E.g.SendChatMessage = function() error("blocked") end
+	W.sentChat = nil
+	WM:Announce()
+	check("a refused send is reported with the text to type by hand, not thrown", printed(W, "The game refused the announce") and printed(W, "!bom"))
+	E.g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
 
 	-- minimap clicks
 	local mm = E.g.WellMetMinimap

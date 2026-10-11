@@ -141,13 +141,20 @@ function WM:Announce()
 		WM:Print("You are not in a group.")
 		return false
 	end
-	local locked = C_ChatInfo.InChatMessagingLockdown()
-	if C_ChatInfo.AreOutgoingAddonChatMessagesRestricted then locked = locked or C_ChatInfo.AreOutgoingAddonChatMessagesRestricted() end
-	if locked then
+	local lockdown = C_ChatInfo.InChatMessagingLockdown()
+	local outgoing = C_ChatInfo.AreOutgoingAddonChatMessagesRestricted and C_ChatInfo.AreOutgoingAddonChatMessagesRestricted()
+	WM:Log("announce: channel=" .. channel .. " lockdown=" .. ns.SafeStr(lockdown) .. " outgoingRestricted=" .. ns.SafeStr(outgoing))
+	if lockdown or outgoing then
 		WM:Print("Can't announce right now: the game blocks addon chat during an encounter, Mythic+ or a PvP match.")
 		return false
 	end
-	SendChatMessage(Requests.AnnounceText(WM.caster), channel)
+	local send = C_ChatInfo.SendChatMessage or SendChatMessage
+	local ok, err = pcall(send, Requests.AnnounceText(WM.caster), channel)
+	if not ok then
+		WM:Print("The game refused the announce (" .. ns.SafeStr(err) .. "). Type this in chat yourself instead: " .. Requests.AnnounceText(WM.caster))
+		WM:Log("announce failed: " .. ns.SafeStr(err))
+		return false
+	end
 	WM:Log("announce sent to " .. channel)
 	return true
 end
