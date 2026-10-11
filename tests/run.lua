@@ -1907,6 +1907,11 @@ do
 	check("a refused send is reported with the text to type by hand, not thrown", printed(W, "The game refused the announce") and printed(W, "!bom"))
 	E.g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
 
+	W.groupSize = 0; W.raid = false; W.instanceGroup = false
+	ns.ClearLog(); WM:Announce()
+	check("an announce that is refused still leaves a log trail of the state it saw", (function() local l = table.concat(ns.LogLines(), "\n"); return l:find("announce: asked", 1, true) and l:find("inGroup=", 1, true) and l:find("announce: refused, no group channel", 1, true) end)() ~= nil)
+	W.groupSize = 3; W.instanceGroup = true
+
 	-- minimap clicks
 	local mm = E.g.WellMetMinimap
 	local logOpened, optionsOpened

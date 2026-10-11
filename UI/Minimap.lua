@@ -38,6 +38,7 @@ function WM:CreateMinimap()
 	reposition()
 
 	b:SetScript("OnClick", function(_, button)
+		WM:Log("minimap click: " .. ns.SafeStr(button) .. " shift=" .. ns.SafeStr(IsShiftKeyDown()) .. " ctrl=" .. ns.SafeStr(IsControlKeyDown()))
 		if IsShiftKeyDown() then WM:ShowLog()
 		elseif IsControlKeyDown() then WM:Announce()
 		elseif button == "RightButton" then

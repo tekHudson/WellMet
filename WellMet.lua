@@ -170,6 +170,7 @@ function WM:SetupSlash()
 			local on = WM:ToggleStrip()
 			WM:Print("reminder strip: " .. (on and "ON (Shift-drag to move it)" or "OFF"))
 		elseif command == "announce" then
+			WM:Log("slash: /wellmet announce")
 			WM:Announce()
 		elseif command == "requests" then
 			WM:RequestsCommand(arg)

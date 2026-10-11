@@ -129,8 +129,12 @@ end
 
 -- Say how to ask, in party or raid chat. Only ever on your click / command, never by itself.
 function WM:Announce()
+	WM:Log("announce: asked. requests enabled=" .. ns.SafeStr(WM.db.requests.enabled) .. " inGroup=" .. ns.SafeStr(IsInGroup())
+		.. " inRaid=" .. ns.SafeStr(IsInRaid()) .. " inInstanceGroup=" .. ns.SafeStr(IsInGroup(LE_PARTY_CATEGORY_INSTANCE))
+		.. " members=" .. ns.SafeStr(GetNumGroupMembers()) .. " combat=" .. ns.SafeStr(InCombatLockdown()))
 	if not WM.db.requests.enabled then
 		WM:Print("Turn on 'Listen for buff requests (beta)' in /wellmet first.")
+		WM:Log("announce: refused, the setting is off")
 		return false
 	end
 	local channel
@@ -139,6 +143,7 @@ function WM:Announce()
 	elseif IsInGroup() then channel = "PARTY" end
 	if not channel then
 		WM:Print("You are not in a group.")
+		WM:Log("announce: refused, no group channel")
 		return false
 	end
 	local lockdown = C_ChatInfo.InChatMessagingLockdown()
@@ -146,9 +151,11 @@ function WM:Announce()
 	WM:Log("announce: channel=" .. channel .. " lockdown=" .. ns.SafeStr(lockdown) .. " outgoingRestricted=" .. ns.SafeStr(outgoing))
 	if lockdown or outgoing then
 		WM:Print("Can't announce right now: the game blocks addon chat during an encounter, Mythic+ or a PvP match.")
+		WM:Log("announce: refused by the lockdown flags")
 		return false
 	end
 	local send = C_ChatInfo.SendChatMessage or SendChatMessage
+	WM:Log("announce: sending with " .. (C_ChatInfo.SendChatMessage and "C_ChatInfo.SendChatMessage" or "SendChatMessage") .. " (" .. #Requests.AnnounceText(WM.caster) .. " chars)")
 	local ok, err = pcall(send, Requests.AnnounceText(WM.caster), channel)
 	if not ok then
 		WM:Print("The game refused the announce (" .. ns.SafeStr(err) .. "). Type this in chat yourself instead: " .. Requests.AnnounceText(WM.caster))
