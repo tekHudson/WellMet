@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.1.1] - 2026-10-12
 ### Changed
 - Buff requests are on by default for new profiles (a profile saved earlier keeps its choice), and are no longer labelled beta.
 
