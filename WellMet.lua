@@ -10,7 +10,7 @@ Layout:
   Core/Spells.lua     spell/aura/range/distance probes (the only place that touches those APIs)
   Core/Discovery.lua  who is around: you, group, target, friendly nameplates
   Core/Select.lua     pure selection logic + "just tried" memory (unit-tested headless)
-  Core/Requests.lua   (beta) buff requests read from chat, remembered per player; the announce
+  Core/Requests.lua   buff requests read from chat, remembered per player; the announce
   Core/Cast.lua       the secure button, PreClick pick, keybind, cast feedback
   Core/Debug.lua      /wellmet log: copyable state dump + event log
   UI/Options.lua      Settings panel

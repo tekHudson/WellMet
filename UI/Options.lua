@@ -554,10 +554,10 @@ local function buildMainPanel(subs)
 	makeButton(panel, "Reset position", 130, 24, y, function() WM:ResetStripPosition() end, "WellMetStripResetButton")
 	makeText(panel, "Shift-drag the icons to move them.", 164, y - 5)
 
-	-- (beta) players ask for their buff in chat; WellMet remembers it
+	-- players ask for their buff in chat; WellMet remembers it
 	y = y - 44
-	makeHeader(panel, "Buff requests (beta)", 16, y); y = y - 28
-	check("Listen for buff requests (beta)", function() return WM.db.requests.enabled end,
+	makeHeader(panel, "Buff requests", 16, y); y = y - 28
+	check("Listen for buff requests", function() return WM.db.requests.enabled end,
 		function(v) WM.db.requests.enabled = v and true or false; WM:ApplyRequests() end)
 	makeText(panel, "Players say !" .. WM.caster.buffs[WM.caster.order[1]].tags[1] .. ", !none or !default in party / raid chat or whisper you, and the key buffs them with that "
 		.. "instead of their class default. Remembered until they change it or you clear it. Chat is hidden during encounters, Mythic+ and PvP, so "

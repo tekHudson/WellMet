@@ -29,11 +29,11 @@ all: no messages, no settings, no minimap button. A single self buff is better s
 - **Set all classes**: on the Party / Raid and Others pages, an icon per buff sits above the class table. Click one to give
   that buff to every class, click it again to clear them all (the red cross skips every class). A count like 4/9 shows when
   only some classes match, and you can still change a single class afterwards.
-- **Buff reminder** (main page, off by default): two small icons, **Self** and **Group** (party and raid together). An
+- **Buff reminder** (main page, on by default): two small icons, **Self** and **Group** (party and raid together). An
   icon glows gold when the key would buff someone in it, goes dark with a green check when everyone is covered, and shows
   a grey ? when the game hides buffs (combat). "Show only when a buff is missing" draws an icon only while it needs one.
   Shift-drag moves them; `/wellmet strip` toggles them.
-- **Buff requests (beta)** (main page, off by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
+- **Buff requests** (main page, off by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
   `!dampen`, `!amp` (Mage), `!motw`, `!thorns` (Druid) or `!fort`, `!spirit`, `!shadow` (Priest) in party or raid chat, or
   whisper it to you, and the key buffs them with that instead of their class default. `!none` means no buff from you and
   `!default` resets. Requests are remembered per player (and per caster class) until they change it or you clear it

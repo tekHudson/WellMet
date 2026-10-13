@@ -5,10 +5,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Changed
+- Buff requests are on by default for new profiles (a profile saved earlier keeps its choice), and are no longer labelled beta.
 
 ## [1.1.0] - 2026-10-11
 ### Added
-- Buff requests (beta; settings > Buff requests, off by default): players say `!bom`, `!bow`, `!fort`, `!ai` ... (or `!none`,
+- Buff requests (beta; settings > Buff requests, on by default): players say `!bom`, `!bow`, `!fort`, `!ai` ... (or `!none`,
   `!default`) in party or raid chat, or whisper it to you, and the key buffs them with that instead of their class default.
   Requests are remembered per player (and per caster class) until they change it or you clear it (`/wellmet requests clear`,
   or the Clear requests button). Switching the setting off stops listening and ignores saved requests. Chat is hidden by the

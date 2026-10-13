@@ -149,7 +149,7 @@ function WM:BuildReport()
 		if not any then add("  no chat messages seen yet. With debug on, send yourself a whisper or say something in party / raid, then reopen this.") end
 	end)
 
-	section(out, "Buff requests (beta)", function(add)
+	section(out, "Buff requests", function(add)
 		local list = ns.Requests.List()
 		add("listening for requests: " .. yn(db.requests.enabled) .. "   saved for " .. WM.classToken .. ": " .. ns.Requests.Count(list))
 		for _, req in pairs(list) do

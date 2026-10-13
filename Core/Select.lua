@@ -190,7 +190,7 @@ function Select.Pick(cands, ctx)
 				end
 			end
 		end
-		-- (beta) a player who asked for a buff in chat gets that one instead of their class default
+		-- a player who asked for a buff in chat gets that one instead of their class default
 		local req = ctx.requests and cand.tier ~= 0 and cand.guid and ctx.requests[cand.guid]
 		if req then
 			if req.buff == "NONE" then

@@ -1,4 +1,4 @@
---[[ WellMet — buff requests (beta): players tell you in chat which buff they want, and it is remembered.
+--[[ WellMet — buff requests: players tell you in chat which buff they want, and it is remembered.
 
 A player writes "!bom" (or "!fort", "!ai" ... the words are each buff's `tags` in Data/Classes.lua) in party or raid
 chat, or whispers it to you. That replaces your class default for THAT person: the key buffs them with what they
@@ -6,7 +6,7 @@ asked for. "!none" = no buff from you, "!default" = back to the class default. R
 variables, per caster class (a Paladin's "!bom" means nothing to a Mage), until the person changes it or you clear
 them (settings, or /wellmet requests clear).
 
-Off by default (settings > Buff requests (beta)). While it is off nothing is listened to and saved requests are
+On by default (settings > Buff requests); a fresh profile gets it on, a profile saved earlier keeps its choice. While it is off nothing is listened to and saved requests are
 ignored. Forever hides chat text, sender and guid during a chat messaging lockdown (an encounter, a Mythic+ run,
 a PvP match), so a message in that time is ignored; requests already saved still work.
 
@@ -133,7 +133,7 @@ function WM:Announce()
 		.. " inRaid=" .. ns.SafeStr(IsInRaid()) .. " inInstanceGroup=" .. ns.SafeStr(IsInGroup(LE_PARTY_CATEGORY_INSTANCE))
 		.. " members=" .. ns.SafeStr(GetNumGroupMembers()) .. " combat=" .. ns.SafeStr(InCombatLockdown()))
 	if not WM.db.requests.enabled then
-		WM:Print("Turn on 'Listen for buff requests (beta)' in /wellmet first.")
+		WM:Print("Turn on 'Listen for buff requests' in /wellmet first.")
 		WM:Log("announce: refused, the setting is off")
 		return false
 	end
@@ -182,7 +182,7 @@ function WM:RequestsCommand(arg)
 		WM:Print("forgot all saved buff requests")
 		return
 	end
-	WM:Print("Buff requests (beta) are " .. (WM.db.requests.enabled and "ON" or "OFF") .. ": " .. Requests.Count(list) .. " saved.")
+	WM:Print("Buff requests are " .. (WM.db.requests.enabled and "ON" or "OFF") .. ": " .. Requests.Count(list) .. " saved.")
 	for guid, req in pairs(list) do
 		WM:Print("  " .. ns.SafeStr(req.name) .. (req.class and (" (" .. req.class .. ")") or "") .. ": " .. Requests.Describe(WM.caster, req))
 	end

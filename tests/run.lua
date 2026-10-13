@@ -1796,7 +1796,7 @@ do
 end
 
 ----------------------------------------------------------------------
-print("== Buff requests (beta)")
+print("== Buff requests")
 do
 	local WM, ns, E, W = load()
 	local R, caster = ns.Requests, WM.caster
@@ -1814,9 +1814,11 @@ do
 	local mageWM = load({ class = "MAGE" })
 	check("Mage: !ai asks for Arcane Intellect, !amp for Amplify", select(2, R.Parse(mageWM.caster, "!ai")) == "INTELLECT" and select(2, R.Parse(mageWM.caster, "!amp")) == "AMPLIFY")
 
-	-- off by default: nothing is listened to
+	-- on by default; off stops listening
 	local f = ns.requestFrame
-	check("off by default: no chat is listened to", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY)) and WM.db.requests.enabled == false)
+	check("on by default: a fresh profile listens to whispers and party chat", WM.db.requests.enabled == true and f.events.CHAT_MSG_WHISPER and f.events.CHAT_MSG_PARTY)
+	WM.db.requests.enabled = false; WM:ApplyRequests()
+	check("switched off: no chat is listened to", not (f.events and (f.events.CHAT_MSG_WHISPER or f.events.CHAT_MSG_PARTY)))
 	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bok", "Brakka", "", "", "", "", 0, 0, "", 0, 1, "Player-brakka")
 	check("...and a request that arrives anyway is ignored", R.Count(R.List()) == 0)
 	WM.db.requests.enabled = true; WM:ApplyRequests()
@@ -1875,16 +1877,16 @@ do
 	-- per caster class, survives like the other settings, clearing
 	check("requests are kept per caster class", WM.db.requests.list.PALADIN ~= nil and WM.db.requests.list.MAGE == nil)
 	WM:RequestsCommand("")
-	check("/wellmet requests lists them", printed(W, "Buff requests (beta) are ON: 1 saved") and printed(W, "Brakka (WARRIOR)"))
+	check("/wellmet requests lists them", printed(W, "Buff requests are ON: 1 saved") and printed(W, "Brakka (WARRIOR)"))
 	WM:RequestsCommand("clear")
 	check("/wellmet requests clear forgets them all", R.Count(R.List()) == 0)
-	check("the report has a Buff requests section", WM:BuildReport():find("== Buff requests (beta)", 1, true) ~= nil)
+	check("the report has a Buff requests section", WM:BuildReport():find("== Buff requests", 1, true) ~= nil)
 
 	-- announce
 	W.sentChat = nil
 	WM.db.requests.enabled = false
 	WM:Announce()
-	check("announce while the feature is off says to turn it on and sends nothing", W.sentChat == nil and printed(W, "Turn on 'Listen for buff requests (beta)'"))
+	check("announce while the feature is off says to turn it on and sends nothing", W.sentChat == nil and printed(W, "Turn on 'Listen for buff requests'"))
 	WM.db.requests.enabled = true
 	W.groupSize = 0
 	WM:Announce()
@@ -1952,7 +1954,7 @@ do
 
 	-- settings page
 	check("the settings page has the beta checkbox and both buttons", E.g.WellMetAnnounceButton ~= nil and E.g.WellMetClearRequestsButton ~= nil
-		and readFile("UI/Options.lua"):find("Listen for buff requests (beta)", 1, true) ~= nil)
+		and readFile("UI/Options.lua"):find("Listen for buff requests", 1, true) ~= nil)
 end
 
 print(string.format("\n%d passed, %d failed", passes, failures))
