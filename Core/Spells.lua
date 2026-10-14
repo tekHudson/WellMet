@@ -129,6 +129,14 @@ function ns.AuraTimes(unit, buff)
 	return nil
 end
 
+-- How much of this buff's time is LEFT on `unit`, as a share (0 to 1): 0.2 = the last fifth. nil when the buff is not there,
+-- has no end, or the game does not give its time.
+function ns.AuraRemaining(unit, buff)
+	local t = ns.AuraTimes(unit, buff)
+	if not t or type(t.left) ~= "number" or type(t.duration) ~= "number" or t.duration <= 0 then return nil end
+	return math.min(1, t.left / t.duration)
+end
+
 -- Seconds until `buff` can be cast (the global cooldown counts), 0 when it is ready, nil when the game hides it.
 function ns.CooldownLeft(buff)
 	local cd = C_Spell.GetSpellCooldown(buff.name)
@@ -164,5 +172,6 @@ ns.Probe = {
 	inRange  = ns.InRange,
 	lacks    = ns.Lacks,
 	state    = ns.AuraState,
+	remaining = ns.AuraRemaining,
 	distance = ns.Distance,
 }

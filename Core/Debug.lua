@@ -163,8 +163,8 @@ function WM:BuildReport()
 		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
 		local best, skipped, eligible = ns.Select.Pick(cands, ctx)
 		for i, e in ipairs(eligible) do
-			add(string.format("  ELIGIBLE #%d  %s  -> %s  dist=%s%s", i, candLine(e.cand), e.buff.name,
-				e.dist == math.huge and "?" or S(e.dist), (e == best) and "   <== next press" or ""))
+			add(string.format("  ELIGIBLE #%d  %s  -> %s  dist=%s%s%s", i, candLine(e.cand), e.buff.name,
+				e.dist == math.huge and "?" or S(e.dist), e.refresh and ("  (" .. e.note .. ")") or "", (e == best) and "   <== next press" or ""))
 		end
 		for _, s in ipairs(skipped) do
 			add(string.format("  skipped      %s  (%s)", candLine(s.cand), s.reason))

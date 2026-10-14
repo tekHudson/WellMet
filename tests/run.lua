@@ -1850,6 +1850,94 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Refresh running-out buffs")
+do
+	local WM, ns, E, W = load({ class = "MAGE" })
+	local Select = ns.Select
+	check("on by default at 20%", WM.db.refresh.enabled == true and WM.db.refresh.percent == 20)
+	local function cand(key, tier, order) return { unit = key, key = key, name = key, tier = tier, class = "MAGE", order = order or 1 } end
+	-- fake probe: has[key] = true (has the buff); share[key] = share of its time left; state[key] = "mine" | "other"
+	local function probe(o)
+		return {
+			known = function() return true end,
+			inRange = function() return true end,
+			lacks = function(unit) return not (o.has and o.has[unit]) end,
+			state = function(unit) return (o.state and o.state[unit]) or ((o.has and o.has[unit]) and "mine" or "absent") end,
+			remaining = function(unit) return o.share and o.share[unit] end,
+			distance = function() return nil end,
+		}
+	end
+	local function settings(refresh)
+		local st = mkSettings({})
+		st.refresh = refresh or { enabled = true, percent = 20 }
+		return st
+	end
+	local function pick(cands, o, refresh, caster)
+		return Select.Pick(cands, { now = 100, settings = settings(refresh), caster = caster or WM.caster, probe = probe(o) })
+	end
+	local best, skipped = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.1 } })
+	check("a buff at 10% left is refreshed", best and best.cand.key == "a" and best.refresh == 0.1 and best.note:find("10%% of its time left") ~= nil)
+	best, skipped = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.5 } })
+	check("a buff at 50% left is left alone", best == nil and skipped[1].reason:find("already has", 1, true) ~= nil)
+	best = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.2 } })
+	check("exactly the threshold (20%) counts", best ~= nil)
+	best = pick({ cand("a", 1) }, { has = { a = true } })
+	check("a buff whose time the game does not give is left alone", best == nil)
+	best = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.1 } }, { enabled = false, percent = 20 })
+	check("switched off: no refreshing", best == nil)
+	best = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.1 } }, { enabled = true, percent = 5 })
+	check("a lower threshold (5%) leaves 10% alone", best == nil)
+	best = pick({ cand("a", 1) }, { has = { a = true }, share = { a = 0.4 } }, { enabled = true, percent = 50 })
+	check("a higher threshold (50%) refreshes 40%", best ~= nil)
+
+	best = pick({ cand("old", 1, 1), cand("missing", 2, 2) }, { has = { old = true }, share = { old = 0.05 } })
+	check("someone MISSING a buff comes before a refresh, even a closer-tier one", best.cand.key == "missing" and best.refresh == nil)
+	local _, _, eligible = pick({ cand("late", 1, 1), cand("urgent", 2, 2) }, { has = { late = true, urgent = true }, share = { late = 0.15, urgent = 0.04 } })
+	check("among refreshes the most urgent comes first", eligible[1].cand.key == "urgent")
+	best = pick({ cand("other", 1) }, { has = { other = true }, state = { other = "other" }, share = { other = 0.05 } })
+	check("Mage/Priest/Druid refresh anyone's buff", best ~= nil)
+
+	-- Paladin: only your own blessing
+	local PW = load()
+	local pal = PW.caster
+	best = Select.Pick({ cand("p", 1) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "other" }, share = { p = 0.05 } }) })
+	check("Paladin: another Paladin's blessing is not refreshed", best == nil)
+	best = Select.Pick({ cand("p", 1) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "mine" }, share = { p = 0.05 } }) })
+	check("Paladin: your own blessing is", best ~= nil and best.refresh == 0.05)
+
+	-- the real aura reader
+	local WM2, ns2, E2, W2 = load({ class = "MAGE" })
+	W2.spells["Arcane Intellect"] = 1459; W2.known[1459] = true
+	addUnit(W2, "party1", { class = "MAGE", guid = "Player-m", name = "Mia", dist = 5, auras = { ["Arcane Intellect"] = "mine" } })
+	W2.groupSize = 1
+	local real = E2.g.C_UnitAuras.GetAuraDataBySpellName
+	local left = 300
+	E2.g.C_UnitAuras.GetAuraDataBySpellName = function(unit, name, filter)
+		local a = real(unit, name, filter)
+		if a and unit == "party1" then a.duration = 3600; a.expirationTime = W2.now + left end
+		return a
+	end
+	check("AuraRemaining is the share of the time left", math.abs(ns2.AuraRemaining("party1", WM2.caster.buffs.INTELLECT) - 300 / 3600) < 1e-9)
+	WM2.db.party.enabled = true
+	local model = ns2.StripModel()
+	local group
+	for _, m in ipairs(model) do if m.key == "group" then group = m end end
+	check("the Group icon counts a buff that is running out as needing one", group and group.state == "need" and group.count == 1)
+	left = 3000
+	model = ns2.StripModel(); group = nil
+	for _, m in ipairs(model) do if m.key == "group" then group = m end end
+	check("...and not one with plenty of time left", group and group.state == "ok")
+	left = 300
+	check("the report marks a refresh in the eligible list", (function()
+		local r = WM2:BuildReport(); return r:find("refresh: 8% of its time left", 1, true) ~= nil
+	end)())
+
+	-- the settings page
+	check("the main page has the refresh checkbox and the percent slider", E.g.WellMetRefreshSlider ~= nil
+		and readFile("UI/Options.lua"):find("Rebuff people whose buff is nearly gone", 1, true) ~= nil)
+end
+
+----------------------------------------------------------------------
 print("== Buff requests")
 do
 	local WM, ns, E, W = load()

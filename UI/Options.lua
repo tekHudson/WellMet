@@ -198,6 +198,40 @@ end
 
 -- A hidden canvas panel with a title and a subtitle. Panels start hidden (a shown frame at login once
 -- locked the keyboard); the settings screen shows them. `panel.refreshers` re-read the saved values on show.
+-- A percent slider in steps (10%, 20% ...). Uses the stock slider template; if the client has none, a dropdown with the
+-- same steps stands in so the page still builds. `.refresh()` re-reads `get()`.
+local function makeSlider(parent, name, x, y, minValue, maxValue, step, get, set)
+	local ok, s = pcall(CreateFrame, "Slider", name, parent, "OptionsSliderTemplate")
+	if not ok or not s then
+		local options = {}
+		for v = minValue, maxValue, step do options[#options + 1] = { v, v .. "%" } end
+		return makeDropdown(parent, name, 90, x, y, options, get, set)
+	end
+	s:SetPoint("TOPLEFT", x + 6, y - 14)
+	s:SetWidth(260)
+	s:SetMinMaxValues(minValue, maxValue)
+	s:SetValueStep(step)
+	if s.SetObeyStepOnDrag then s:SetObeyStepOnDrag(true) end
+	local low, high, text = _G[name .. "Low"], _G[name .. "High"], _G[name .. "Text"]
+	if low then low:SetText(minValue .. "%") end
+	if high then high:SetText(maxValue .. "%") end
+	local function show(v) if text then text:SetText(v .. "%") end end
+	local updating = false
+	s:SetScript("OnValueChanged", function(_, v)
+		v = math.floor(v / step + 0.5) * step
+		show(v)
+		if not updating then set(v) end
+	end)
+	s.refresh = function()
+		updating = true
+		local v = get()
+		s:SetValue(v)
+		show(v)
+		updating = false
+	end
+	return s
+end
+
 -- The page scrolls: the settings screen gets `panel.outer` (a frame holding a stock scroll frame), and everything is
 -- built on `panel`, the tall frame inside it. Each builder ends with fitPanel(panel, y) to say how tall the content is.
 local function newPanel(globalName, displayName, title, subtitle)
@@ -544,8 +578,19 @@ local function buildMainPanel(subs)
 	y = y - 20
 	makeText(panel, "Create macro puts a /click WellMetCast macro on your cursor: click an action bar slot. It buffs you and your group, "
 		.. "not strangers (the game won't run that from inside a macro), so strangers need the key.", 24, y)
-	-- the Self / Group icons that say who still needs a buff
+	-- buffs that are running out
 	y = y - 52
+	makeHeader(panel, "Refresh running-out buffs", 16, y); y = y - 28
+	check("Rebuff people whose buff is nearly gone", function() return WM.db.refresh.enabled end,
+		function(v) WM.db.refresh.enabled = v and true or false end)
+	makeText(panel, "Someone missing a buff still comes first. Then the key refreshes buffs that have this much of their time left or less:", 24, y)
+	y = y - 30
+	local slider = makeSlider(panel, "WellMetRefreshSlider", 24, y, 10, 90, 10,
+		function() return WM.db.refresh.percent end, function(v) WM.db.refresh.percent = v end)
+	panel.refreshers[#panel.refreshers + 1] = slider.refresh
+	y = y - 40
+
+	-- the Self / Group icons that say who still needs a buff
 	makeHeader(panel, "Buff reminder", 16, y); y = y - 28
 	check("Show UI buff reminder (Self and Group icons)", function() return WM.db.strip.enabled end,
 		function(v) WM.db.strip.enabled = v and true or false; WM:ApplyStrip() end)

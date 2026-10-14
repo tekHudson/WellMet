@@ -112,6 +112,10 @@ end
 -- You, then your group, then everyone else; nearest first within each.
 local function before()
 	return function(a, b)
+		-- someone MISSING a buff comes before someone whose buff is merely running out; those go most urgent first
+		local ra, rb = a.refresh, b.refresh
+		if (ra ~= nil) ~= (rb ~= nil) then return rb ~= nil end
+		if ra and rb and ra ~= rb then return ra < rb end
 		local ta, tb = a.cand.tier, b.cand.tier
 		if ta ~= tb then return ta < tb end
 		if a.dist ~= b.dist then return a.dist < b.dist end
@@ -135,7 +139,19 @@ function Select.Pick(cands, ctx)
 		return v
 	end
 
-	-- Why this (person, buff) pair can't be cast right now, or nil (+ the distance when it can).
+	-- Is this buff on them but nearly gone? Returns the share of its time that is left (e.g. 0.12) when that is at or below
+	-- the "refresh" setting, else nil. A Paladin only refreshes his OWN blessing (a recast would replace another Paladin's).
+	local function refreshFraction(cand, buff)
+		local r = settings.refresh
+		if not (r and r.enabled and probe.remaining) then return nil end
+		if ctx.caster.mode == "assign" and probe.state and probe.state(cand.unit, buff) ~= "mine" then return nil end
+		local share = probe.remaining(cand.unit, buff)
+		if share and share <= (r.percent or 20) / 100 then return share end
+		return nil
+	end
+
+	-- Why this (person, buff) pair can't be cast right now, or nil (+ the distance when it can; + the share of time left
+	-- when it is a refresh of a buff that is running out).
 	local function whyNot(cand, buff, cfg, skipAura)
 		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
 		if not known(buff) then return buff.name .. " is not learned" end
@@ -152,17 +168,22 @@ function Select.Pick(cands, ctx)
 		end
 		if skipAura then return nil, dist end
 		local lacks = probe.lacks(cand.unit, buff)
-		if lacks == false then return "already has " .. buff.name end
+		if lacks == false then
+			local share = refreshFraction(cand, buff)
+			if share then return nil, dist, share end
+			return "already has " .. buff.name
+		end
 		if lacks == nil then return "aura info unavailable right now" end
 		return nil, dist
 	end
 
 	local function add(cand, buff, cfg)
-		local reason, dist = whyNot(cand, buff, cfg)
+		local reason, dist, share = whyNot(cand, buff, cfg)
 		if reason then
 			skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
 		else
-			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge }
+			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge, refresh = share,
+				note = share and string.format("refresh: %d%% of its time left", math.floor(share * 100 + 0.5)) or nil }
 		end
 	end
 
@@ -174,10 +195,16 @@ function Select.Pick(cands, ctx)
 		local sP, sS = probe.state(cand.unit, primary), probe.state(cand.unit, secondary)
 		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
 		if sP == nil or sS == nil then return skip(primary, "aura info unavailable right now") end
-		if sP == "mine" then return skip(primary, "already has your " .. primary.name) end
-		if sS == "mine" then return skip(secondary, "already has your " .. secondary.name) end
-		local chosen, note
-		if sP == "absent" then
+		local chosen, note, share
+		if sP == "mine" then
+			share = refreshFraction(cand, primary)
+			if not share then return skip(primary, "already has your " .. primary.name) end
+			chosen = primary
+		elseif sS == "mine" then
+			share = refreshFraction(cand, secondary)
+			if not share then return skip(secondary, "already has your " .. secondary.name) end
+			chosen = secondary
+		elseif sP == "absent" then
 			chosen = primary
 		elseif sS == "absent" then
 			chosen, note = secondary, primary.name .. " is on them from someone else, so " .. secondary.name .. " instead"
@@ -186,7 +213,8 @@ function Select.Pick(cands, ctx)
 		end
 		local reason, dist = whyNot(cand, chosen, cfg, true)
 		if reason then return skip(chosen, reason) end
-		eligible[#eligible + 1] = { cand = cand, buff = chosen, dist = dist or math.huge, note = note }
+		if share then note = string.format("refresh: %d%% of its time left", math.floor(share * 100 + 0.5)) end
+		eligible[#eligible + 1] = { cand = cand, buff = chosen, dist = dist or math.huge, note = note, refresh = share }
 	end
 
 	local function consider(cand)

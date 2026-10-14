@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- Refresh running-out buffs (settings > Refresh running-out buffs, on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (10% to 90% slider). Someone missing a buff always comes first, then the most urgent refresh. Works for anyone's buffs, strangers included, except Paladin blessings, where only your own are refreshed (a recast would replace another Paladin's). The Self and Group reminder icons count a buff that is running out as needing one, and `/wellmet log` marks refreshes in the eligible list.
 - Debug log: a "Buff time left" section lists, for everyone nearby, each of your buffs that is on them, who cast it and how long is left on it (or that the game does not give the time). It is a probe for refreshing buffs that are about to run out.
 
 ### Changed
