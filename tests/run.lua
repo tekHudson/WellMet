@@ -1897,13 +1897,16 @@ do
 	best = pick({ cand("other", 1) }, { has = { other = true }, state = { other = "other" }, share = { other = 0.05 } })
 	check("Mage/Priest/Druid refresh anyone's buff", best ~= nil)
 
-	-- Paladin: only your own blessing
+	-- Paladin: only your own blessing on you and your group; anyone's on strangers
 	local PW = load()
 	local pal = PW.caster
 	best = Select.Pick({ cand("p", 1) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "other" }, share = { p = 0.05 } }) })
 	check("Paladin: another Paladin's blessing is not refreshed", best == nil)
 	best = Select.Pick({ cand("p", 1) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "mine" }, share = { p = 0.05 } }) })
 	check("Paladin: your own blessing is", best ~= nil and best.refresh == 0.05)
+
+	best = Select.Pick({ cand("p", 2) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "other" }, share = { p = 0.05 } }) })
+	check("Paladin: on strangers (Others) another Paladin's blessing is refreshed", best ~= nil and best.refresh == 0.05)
 
 	-- the real aura reader
 	local WM2, ns2, E2, W2 = load({ class = "MAGE" })

@@ -146,11 +146,12 @@ function Select.Pick(cands, ctx)
 	end
 
 	-- Is this buff on them but nearly gone? Returns the share of its time that is left (e.g. 0.12) when that is at or below
-	-- the "refresh" setting, else nil. A Paladin only refreshes his OWN blessing (a recast would replace another Paladin's).
+	-- the "refresh" setting, else nil. A Paladin refreshes only his OWN blessing on you and your group (a recast would replace
+	-- another Paladin's); on strangers (Others) he refreshes anyone's.
 	local function refreshFraction(cand, buff)
 		local r = settings.refresh
 		if not (r and r.enabled and probe.remaining) then return nil end
-		if ctx.caster.mode == "assign" and probe.state and probe.state(cand.unit, buff) ~= "mine" then return nil end
+		if ctx.caster.mode == "assign" and cand.tier ~= 2 and probe.state and probe.state(cand.unit, buff) ~= "mine" then return nil end
 		local share = probe.remaining(cand.unit, buff)
 		if share and share <= (r.percent or 20) / 100 then return share end
 		return nil
@@ -215,7 +216,11 @@ function Select.Pick(cands, ctx)
 		elseif sS == "absent" then
 			chosen, note = secondary, primary.name .. " is on them from someone else, so " .. secondary.name .. " instead"
 		else
-			return skip(primary, "already has " .. primary.name .. " and " .. secondary.name .. " (from others)")
+			-- both are on them from others: recast whichever is closer to running out (strangers only, so replacing is fine)
+			local shareP, shareS = refreshFraction(cand, primary), refreshFraction(cand, secondary)
+			if shareP and (not shareS or shareP <= shareS) then chosen, share = primary, shareP
+			elseif shareS then chosen, share = secondary, shareS
+			else return skip(primary, "already has " .. primary.name .. " and " .. secondary.name .. " (from others)") end
 		end
 		local reason, dist = whyNot(cand, chosen, cfg, true)
 		if reason then return skip(chosen, reason) end
