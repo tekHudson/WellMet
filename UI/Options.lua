@@ -664,16 +664,16 @@ function WM:CreateOptions()
 	local category = Settings.RegisterCanvasLayoutCategory(main.outer, "WellMet")
 	Settings.RegisterAddOnCategory(category)
 	WM.optionsCategory = category
+	WM.optionsExtra = {
+		priority = Settings.RegisterCanvasLayoutSubcategory(category, panels.priority.outer, "Priority"),
+		tools = Settings.RegisterCanvasLayoutSubcategory(category, panels.tools.outer, "Group tools"),
+	}
 	WM.optionsSub = {}
 	for _, sectionKey in ipairs(ns.SECTIONS) do
 		if panels[sectionKey] then
 			WM.optionsSub[sectionKey] = Settings.RegisterCanvasLayoutSubcategory(category, panels[sectionKey].outer, SECTION_TITLE[sectionKey])
 		end
 	end
-	WM.optionsExtra = {
-		priority = Settings.RegisterCanvasLayoutSubcategory(category, panels.priority.outer, "Priority"),
-		tools = Settings.RegisterCanvasLayoutSubcategory(category, panels.tools.outer, "Group tools"),
-	}
 	WM.optionsPanel = main
 	WM.optionsPanels = panels
 	WM:ApplySectionVisibility()
