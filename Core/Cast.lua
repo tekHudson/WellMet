@@ -22,6 +22,7 @@ local CLICK_ACTION = "CLICK " .. BUTTON_NAME .. ":LeftButton"
 local TRIED_SECONDS    = 8     -- skip someone we just cast on (until the aura shows)
 local FAILED_SECONDS   = 5     -- out of range: people move
 local LOS_SECONDS      = 5     -- line of sight: people move around corners
+local RETRY_WINDOW     = 30    -- a line-of-sight / range failure gets one free retry; a second one within this long skips them
 local QUEUE_WINDOW     = 0.4   -- a press this close to the end of the cooldown goes through (the game queues it)
 local STRONGER_SECONDS = 300   -- a stronger buff from someone else is already on them
 local DEBOUNCE         = 0.15
@@ -224,6 +225,7 @@ local function onSucceeded(_, castGUID)
 	if not p or not p.sent or p.castGUID ~= castGUID then return end
 	WM:Note("Buffed " .. ns.SafeStr(p.name) .. " with " .. p.spell .. ".")
 	WM:Log("cast ok:", p.spell, "->", p.name)
+	ns.Select.Succeeded(p.key, p.spell)
 	WM.pending = nil
 end
 
@@ -234,8 +236,15 @@ local function onError(_, message)
 	local seconds = FAILED_SECONDS
 	if kind == "stronger" then
 		seconds = STRONGER_SECONDS
-	elseif kind == "los" then
-		seconds = LOS_SECONDS
+	else
+		if kind == "los" then seconds = LOS_SECONDS end
+		-- the first line-of-sight / range failure is free: let the next press try them again
+		if not ns.Select.RetryUsed(p.key, p.spell, GetTime(), RETRY_WINDOW) then
+			ns.Select.Mark(p.key, p.spell, 0)
+			WM:Log("cast failed:", ns.SafeStr(message), "-> " .. ns.SafeStr(p.name) .. " may be tried once more")
+			WM.pending = nil
+			return
+		end
 	end
 	ns.Select.Mark(p.key, p.spell, seconds)
 	WM:Log("cast failed:", ns.SafeStr(message), "-> skipping", p.name, "for", seconds .. "s")

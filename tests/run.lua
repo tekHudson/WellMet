@@ -1348,13 +1348,31 @@ do
 	local function blockedFor(seconds) return (ns.Select.IsBlocked("G-s", WIS, W.now + seconds)) end
 	ns.Select.Reset()
 	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
-	check("line of sight: skipped for 5 s, however often it repeats", blockedFor(4) and not blockedFor(6))
+	check("line of sight, first time: no skip, the next press may try them again", not blockedFor(0.5) and table.concat(ns.LogLines(), "\n"):find("may be tried once more", 1, true) ~= nil)
+	W.now = W.now + 2
+	fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
+	check("line of sight, second time in a row: skipped for 5 s", blockedFor(4) and not blockedFor(6))
 	ns.Select.Reset(); W.now = W.now + 1
 	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
-	check("out of range: still just 5 s (people move)", blockedFor(4) and not blockedFor(6))
+	check("out of range, first time: no skip", not blockedFor(0.5))
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	check("out of range, second time: 5 s (people move)", blockedFor(4) and not blockedFor(6))
+	ns.Select.Reset(); W.now = W.now + 1
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	W.now = W.now + 40
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	check("a failure more than 30 s after the first counts as a first one again", not blockedFor(0.5))
+	ns.Select.Reset(); W.now = W.now + 1
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SENT", "player", "x", "Cast-r", W.spells[WIS] or 0)
+	WM.pending = { key = "G-s", spell = WIS, name = "Stranger", at = W.now, sent = true, castGUID = "Cast-r" }
+	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-r")
+	fail(E.g.SPELL_FAILED_OUT_OF_RANGE)
+	check("a cast that lands wipes the free retry (the next failure is a first one)", not blockedFor(0.5))
 	ns.Select.Reset(); W.now = W.now + 1
 	fail(E.g.SPELL_FAILED_AURA_BOUNCED)
 	check("a stronger buff already there: 300 s", blockedFor(299) and not blockedFor(301))
+	ns.Select.Reset(); fail(E.g.SPELL_FAILED_LINE_OF_SIGHT); W.now = W.now + 1; fail(E.g.SPELL_FAILED_LINE_OF_SIGHT)
 	check("the log names the skip length", WM:BuildReport():find("skipping Stranger for 5s", 1, true) ~= nil)
 end
 

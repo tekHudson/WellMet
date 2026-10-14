@@ -35,8 +35,24 @@ function Select.IsBlocked(key, spell, now)
 	return true, untilTime - now
 end
 
+-- A short failure (line of sight, out of range) gets one free retry: the first one only releases the person so the next
+-- press can try them again; the second within `window` seconds returns true, meaning skip them now.
+local failedAt = {}
+function Select.RetryUsed(key, spell, now, window)
+	local k = memKey(key, spell)
+	local first = failedAt[k]
+	if first and now - first <= window then failedAt[k] = nil; return true end
+	failedAt[k] = now
+	return false
+end
+
+function Select.Succeeded(key, spell)
+	failedAt[memKey(key, spell)] = nil
+end
+
 function Select.Reset()
 	for k in pairs(memory) do memory[k] = nil end
+	for k in pairs(failedAt) do failedAt[k] = nil end
 end
 
 function Select.MemorySnapshot(now)
