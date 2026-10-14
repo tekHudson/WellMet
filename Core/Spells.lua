@@ -97,6 +97,38 @@ function ns.AuraState(unit, buff)
 	return "absent"
 end
 
+-- How long is left on this buff on `unit` (the buff itself or any `alt`)? For the debug report: finds out whether the
+-- game gives other players' aura times at all. Returns nil when the buff is not on them, else
+-- { name, source = "mine" | "other" | "unknown", duration, left } where duration / left are numbers, "none" (the aura has
+-- no end), "hidden" (a secret value) or "not given" (the field is missing).
+function ns.AuraTimes(unit, buff)
+	local names = { buff.name }
+	for _, alt in ipairs(buff.alt or {}) do names[#names + 1] = alt end
+	for _, name in ipairs(names) do
+		local aura = C_UnitAuras.GetAuraDataBySpellName(unit, name, "HELPFUL")
+		if aura then
+			if issecrettable(aura) then return { name = name, source = "unknown", duration = "hidden", left = "hidden" } end
+			local source = aura.sourceUnit
+			local who = "other"
+			if issecretvalue(source) then who = "unknown"
+			elseif source == nil then who = "unknown"
+			elseif UnitIsUnit("player", source) then who = "mine" end
+			local function number(v)
+				if issecretvalue(v) then return "hidden" end
+				if v == nil then return "not given" end
+				return v
+			end
+			local duration, expires = number(aura.duration), number(aura.expirationTime)
+			local left = expires
+			if type(expires) == "number" then
+				left = (expires == 0) and "none" or math.max(0, expires - GetTime())
+			end
+			return { name = name, source = who, duration = duration, left = left }
+		end
+	end
+	return nil
+end
+
 -- Seconds until `buff` can be cast (the global cooldown counts), 0 when it is ready, nil when the game hides it.
 function ns.CooldownLeft(buff)
 	local cd = C_Spell.GetSpellCooldown(buff.name)

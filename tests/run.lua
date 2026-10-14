@@ -1814,6 +1814,42 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Buff time left (debug probe)")
+do
+	local WM, ns, E, W = load()
+	addUnit(W, "party1", { class = "WARRIOR", guid = "Player-w", name = "Wren", dist = 5, auras = { ["Blessing of Might"] = "mine" } })
+	W.groupSize = 1
+	local t = ns.AuraTimes("party1", WM.caster.buffs.MIGHT)
+	check("a buff that is there reports its caster, and says when the game gives no time", t and t.source == "mine" and t.left == "not given" and t.duration == "not given")
+	check("a buff that is not there reports nothing", ns.AuraTimes("party1", WM.caster.buffs.WISDOM) == nil)
+	-- the game gives a time
+	local real = E.g.C_UnitAuras.GetAuraDataBySpellName
+	E.g.C_UnitAuras.GetAuraDataBySpellName = function(unit, name, filter)
+		local a = real(unit, name, filter)
+		if a then a.duration = 3600; a.expirationTime = W.now + 754 end
+		return a
+	end
+	t = ns.AuraTimes("party1", WM.caster.buffs.MIGHT)
+	check("a given time becomes seconds left", t.duration == 3600 and math.abs(t.left - 754) < 0.01)
+	E.g.C_UnitAuras.GetAuraDataBySpellName = function(unit, name, filter)
+		local a = real(unit, name, filter)
+		if a then a.duration = SECRET; a.expirationTime = SECRET end
+		return a
+	end
+	t = ns.AuraTimes("party1", WM.caster.buffs.MIGHT)
+	check("a secret time is reported as hidden, not read", t.left == "hidden" and t.duration == "hidden")
+	E.g.C_UnitAuras.GetAuraDataBySpellName = function(unit, name, filter)
+		local a = real(unit, name, filter)
+		if a then a.duration = 0; a.expirationTime = 0 end
+		return a
+	end
+	check("an aura with no end is 'none'", ns.AuraTimes("party1", WM.caster.buffs.MIGHT).left == "none")
+	E.g.C_UnitAuras.GetAuraDataBySpellName = real
+	local report = WM:BuildReport()
+	check("the report has the time-left section naming the person and the buff", report:find("== Buff time left", 1, true) and report:find("Wren", 1, true) and report:find("Blessing of Might", 1, true) ~= nil)
+end
+
+----------------------------------------------------------------------
 print("== Buff requests")
 do
 	local WM, ns, E, W = load()

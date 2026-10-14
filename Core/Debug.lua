@@ -176,6 +176,26 @@ function WM:BuildReport()
 		add("recently tried: " .. (#recent > 0 and table.concat(recent, ", ") or "nobody"))
 	end)
 
+	-- Does the game give the time left on a buff, and for whom? (Rebuffing people whose buff is nearly gone needs it.)
+	section(out, "Buff time left (probe: does the game give other players' aura times?)", function(add)
+		local function clock(v)
+			if type(v) ~= "number" then return S(v) end
+			return string.format("%d:%02d", v / 60, v % 60)
+		end
+		local cands = ns.Discovery.Discover()
+		local any
+		for _, cand in ipairs(cands) do
+			for _, key in ipairs(WM.caster.all) do
+				local t = ns.AuraTimes(cand.unit, WM.caster.buffs[key])
+				if t then
+					any = true
+					add(string.format("  %-14s %-26s from %-7s time left %s  (of %s)", S(cand.name), t.name, t.source, clock(t.left), clock(t.duration)))
+				end
+			end
+		end
+		if not any then add("  none of your buffs are on anyone nearby right now (or the game hides auras)") end
+	end)
+
 	local log = ns.LogLines()
 	out[#out + 1] = ""
 	out[#out + 1] = "== Event log (oldest first; time is GetTime seconds)"

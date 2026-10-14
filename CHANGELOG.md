@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- Debug log: a "Buff time left" section lists, for everyone nearby, each of your buffs that is on them, who cast it and how long is left on it (or that the game does not give the time). It is a probe for refreshing buffs that are about to run out.
 
 ## [1.1.1] - 2026-10-12
 ### Changed
