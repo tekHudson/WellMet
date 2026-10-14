@@ -125,6 +125,7 @@ function WM:PLAYER_LOGIN()
 	WM:ApplyChatProbe()
 	WM:ApplyRequests()
 	WM:ApplyBuffBack()
+	if C_Timer and WM.GlowTest then C_Timer.After(3, function() WM:GlowTest(true) end) end      -- TEMPORARY: highlight test, remove before release
 
 	WM:RegisterEvent("SPELLS_CHANGED")
 	WM:RegisterEvent("NAME_PLATE_UNIT_ADDED")
@@ -168,6 +169,8 @@ function WM:SetupSlash()
 		elseif command == "self" or command == "party" or command == "raid" or command == "others" then
 			local section = (command == "raid") and "party" or command
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
+		elseif command == "glowtest" then
+			WM:GlowTest()
 		elseif command == "priority" or command == "tools" then
 			WM:OpenOptions(command)
 		elseif command == "strip" then
