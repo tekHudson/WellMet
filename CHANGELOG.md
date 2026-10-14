@@ -8,6 +8,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 ### Added
 - Debug log: a "Buff time left" section lists, for everyone nearby, each of your buffs that is on them, who cast it and how long is left on it (or that the game does not give the time). It is a probe for refreshing buffs that are about to run out.
 
+### Changed
+- A line-of-sight or out-of-range failure now gets one free retry: the first one doesn't skip anyone, so the next press tries them again; a second failure within 30 seconds skips them for 5 seconds as before. A cast that lands resets it. "A more powerful spell is already active" still skips for 5 minutes.
+
 ## [1.1.1] - 2026-10-12
 ### Changed
 - Buff requests are on by default for new profiles (a profile saved earlier keeps its choice), and are no longer labelled beta.
