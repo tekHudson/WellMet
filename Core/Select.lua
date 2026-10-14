@@ -58,7 +58,7 @@ end
 function Select.MemorySnapshot(now)
 	local out = {}
 	for k, untilTime in pairs(memory) do
-		if untilTime > now then out[#out + 1] = string.format("%s (%.0fs)", k, untilTime - now) end
+		if untilTime > now then out[#out + 1] = string.format("%s (%.0fs)", (k:gsub("|", " / ")), untilTime - now) end
 	end
 	table.sort(out)
 	return out

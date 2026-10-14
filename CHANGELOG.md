@@ -13,6 +13,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 ### Changed
 - A line-of-sight or out-of-range failure now gets one free retry: the first one doesn't skip anyone, so the next press tries them again; a second failure within 30 seconds skips them for 5 seconds as before. A cast that lands resets it. "A more powerful spell is already active" still skips for 5 minutes.
 
+### Fixed
+- The debug log's "recently tried" line no longer loses the first letter of "Righteous Fury" (the game read the separator as a colour code).
+
 ## [1.1.1] - 2026-10-12
 ### Changed
 - Buff requests are on by default for new profiles (a profile saved earlier keeps its choice), and are no longer labelled beta.
