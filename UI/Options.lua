@@ -523,7 +523,7 @@ end
 
 local function buildMainPanel(subs)
 	local panel = newPanel("WellMetOptionsPanel", "WellMet", "WellMet",
-		"One key buffs you, then the next nearby player who needs it. Choose what each part does under Self, Party / Raid and Others.")
+		"One key buffs you, then the next nearby player who needs it. Choose what each part does under Self, Party / Raid and Others; Priority and Group tools hold the extras.")
 	local y = -76
 
 	makeHeader(panel, "Key", 16, y); y = y - 28
@@ -578,33 +578,65 @@ local function buildMainPanel(subs)
 	y = y - 20
 	makeText(panel, "Create macro puts a /click WellMetCast macro on your cursor: click an action bar slot. It buffs you and your group, "
 		.. "not strangers (the game won't run that from inside a macro), so strangers need the key.", 24, y)
-	-- buffs that are running out
-	y = y - 52
-	makeHeader(panel, "Refresh running-out buffs", 16, y); y = y - 28
-	check("Rebuff people whose buff is nearly gone", function() return WM.db.refresh.enabled end,
-		function(v) WM.db.refresh.enabled = v and true or false end)
-	check("Buff back first: whoever just buffed you (last 10 seconds)", function() return WM.db.buffBack.enabled end,
+	return fitPanel(panel, y - 40)
+end
+
+-- a checkbox row that adds itself to the panel's refreshers; returns a function that places the next one
+local function checkRows(panel, y)
+	return function(label, get, set)
+		local cb = makeCheck(panel, label, get, set, 20, y)
+		panel.refreshers[#panel.refreshers + 1] = cb.refresh
+		y = y - 26
+		return y
+	end
+end
+
+-- who gets buffed first, and when a buff that is running out is recast
+local function buildPriorityPanel()
+	local panel = newPanel("WellMetPriorityPanel", "Priority", "Priority",
+		"Who the key picks next: whoever just buffed you, then anyone missing a buff, then buffs that are running out.")
+	local y = -76
+	local row
+	makeHeader(panel, "Buff back first", 16, y); y = y - 28
+	row = checkRows(panel, y)
+	y = row("Buff back first: whoever just buffed you (last 10 seconds)", function() return WM.db.buffBack.enabled end,
 		function(v) WM.db.buffBack.enabled = v and true or false; WM:ApplyBuffBack() end)
-	makeText(panel, "Whoever buffed you comes first, then anyone missing a buff. After that the key refreshes buffs that have this much of their time left or less:", 24, y)
+	makeText(panel, "When another player puts a new buff on you, a key press in the next 10 seconds buffs them first, if they need one.", 24, y)
+	y = y - 40
+
+	makeHeader(panel, "Refresh running-out buffs", 16, y); y = y - 28
+	row = checkRows(panel, y)
+	y = row("Rebuff people whose buff is nearly gone", function() return WM.db.refresh.enabled end,
+		function(v) WM.db.refresh.enabled = v and true or false end)
+	makeText(panel, "Anyone missing a buff comes first. After that the key refreshes buffs that have this much of their time left or less:", 24, y)
 	y = y - 30
 	local slider = makeSlider(panel, "WellMetRefreshSlider", 24, y, 10, 90, 10,
 		function() return WM.db.refresh.percent end, function(v) WM.db.refresh.percent = v end)
 	panel.refreshers[#panel.refreshers + 1] = slider.refresh
 	y = y - 40
+	makeText(panel, "A Paladin refreshes only his own blessings on you and your group, but anyone's on strangers (Others).", 24, y)
+	return fitPanel(panel, y - 20)
+end
 
-	-- the Self / Group icons that say who still needs a buff
+-- the reminder icons and the chat requests
+local function buildGroupToolsPanel()
+	local panel = newPanel("WellMetGroupToolsPanel", "Group tools", "Group tools",
+		"The Self / Group reminder icons, and buff requests from party and raid chat.")
+	local y = -76
 	makeHeader(panel, "Buff reminder", 16, y); y = y - 28
-	check("Show UI buff reminder (Self and Group icons)", function() return WM.db.strip.enabled end,
+	local row = checkRows(panel, y)
+	y = row("Show UI buff reminder (Self and Group icons)", function() return WM.db.strip.enabled end,
 		function(v) WM.db.strip.enabled = v and true or false; WM:ApplyStrip() end)
-	check("Show only when a buff is missing", function() return WM.db.strip.onlyWhenMissing end,
+	row = checkRows(panel, y)
+	y = row("Show only when a buff is missing", function() return WM.db.strip.onlyWhenMissing end,
 		function(v) WM.db.strip.onlyWhenMissing = v and true or false; WM:RefreshStrip() end)
 	makeButton(panel, "Reset position", 130, 24, y, function() WM:ResetStripPosition() end, "WellMetStripResetButton")
 	makeText(panel, "Shift-drag the icons to move them.", 164, y - 5)
 
-	-- players ask for their buff in chat; WellMet remembers it
 	y = y - 44
 	makeHeader(panel, "Buff requests", 16, y); y = y - 28
-	check("Listen for buff requests", function() return WM.db.requests.enabled end,
+	row = checkRows(panel, y)
+	y = row("Listen for buff requests", function() return WM.db.requests.enabled end,
 		function(v) WM.db.requests.enabled = v and true or false; WM:ApplyRequests() end)
 	makeText(panel, "Players say !" .. WM.caster.buffs[WM.caster.order[1]].tags[1] .. ", !none or !default in party / raid chat or whisper you, and the key buffs them with that "
 		.. "instead of their class default. Remembered until they change it or you clear it. Chat is hidden during encounters, Mythic+ and PvP, so "
@@ -626,6 +658,8 @@ function WM:CreateOptions()
 	panels.party = buildPartyPanel(caster)
 	panels.others = buildOthersPanel(caster)
 	local main = buildMainPanel()
+	panels.priority = buildPriorityPanel()
+	panels.tools = buildGroupToolsPanel()
 
 	local category = Settings.RegisterCanvasLayoutCategory(main.outer, "WellMet")
 	Settings.RegisterAddOnCategory(category)
@@ -636,6 +670,10 @@ function WM:CreateOptions()
 			WM.optionsSub[sectionKey] = Settings.RegisterCanvasLayoutSubcategory(category, panels[sectionKey].outer, SECTION_TITLE[sectionKey])
 		end
 	end
+	WM.optionsExtra = {
+		priority = Settings.RegisterCanvasLayoutSubcategory(category, panels.priority.outer, "Priority"),
+		tools = Settings.RegisterCanvasLayoutSubcategory(category, panels.tools.outer, "Group tools"),
+	}
 	WM.optionsPanel = main
 	WM.optionsPanels = panels
 	WM:ApplySectionVisibility()
@@ -669,7 +707,9 @@ end
 -- page, so that opens the main page and says why.
 function WM:OpenOptions(sectionKey)
 	local category = WM.optionsCategory
-	if sectionKey and WM.optionsSub[sectionKey] then
+	if sectionKey and WM.optionsExtra and WM.optionsExtra[sectionKey] then
+		category = WM.optionsExtra[sectionKey]
+	elseif sectionKey and WM.optionsSub[sectionKey] then
 		if WM.db[sectionKey].enabled then
 			category = WM.optionsSub[sectionKey]
 		else

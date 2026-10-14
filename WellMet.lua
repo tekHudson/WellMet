@@ -168,6 +168,8 @@ function WM:SetupSlash()
 		elseif command == "self" or command == "party" or command == "raid" or command == "others" then
 			local section = (command == "raid") and "party" or command
 			WM:OpenOptions(WM.optionsSub[section] and section or nil)      -- a class with no Party / Others section opens the main panel
+		elseif command == "priority" or command == "tools" then
+			WM:OpenOptions(command)
 		elseif command == "strip" then
 			local on = WM:ToggleStrip()
 			WM:Print("reminder strip: " .. (on and "ON (Shift-drag to move it)" or "OFF"))
@@ -179,7 +181,7 @@ function WM:SetupSlash()
 		elseif command == "macro" then
 			WM:CreateMacro()
 		else
-			WM:Print("/wellmet — settings | self | party | others | log (or why) | log clear | macro | strip | announce | requests (clear) | forget | debug  (set the key under Key Bindings > WellMet)")
+			WM:Print("/wellmet — settings | self | party | others | priority | tools | log (or why) | log clear | macro | strip | announce | requests (clear) | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
 		end
 	end

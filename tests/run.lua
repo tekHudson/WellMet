@@ -964,12 +964,12 @@ do
 	-- the settings tree: a main panel plus one sub-panel per section the class can use
 	local names = {}
 	for _, sub in ipairs(W.subcategories or {}) do names[#names + 1] = sub.name end
-	check("Paladin: sub-panels Self, Party / Raid, Others", table.concat(names, "|") == "Self|Party / Raid|Others")
+	check("Paladin: sub-panels Self, Party / Raid, Others, Priority, Group tools", table.concat(names, "|") == "Self|Party / Raid|Others|Priority|Group tools")
 	for _, class in ipairs({ "MAGE", "DRUID", "PRIEST" }) do
 		local _, _, _, Wc = load({ class = class })
 		local cnames = {}
 		for _, sub in ipairs(Wc.subcategories or {}) do cnames[#cnames + 1] = sub.name end
-		check(class .. ": all three sub-panels (every supported class buffs other players)", table.concat(cnames, "|") == "Self|Party / Raid|Others")
+		check(class .. ": all five sub-panels (every supported class buffs other players)", table.concat(cnames, "|") == "Self|Party / Raid|Others|Priority|Group tools")
 	end
 	local Ew = E
 	check("the Create macro button is on the main page (General), and not on the Self or Party / Raid pages",

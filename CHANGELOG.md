@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Changed
+- The main settings page was getting long, so two pages moved under WellMet: **Priority** (buff back first, refresh running-out buffs and its slider) and **Group tools** (the reminder icons, buff requests). `/wellmet priority` and `/wellmet tools` open them.
 
 ## [1.2.0] - 2026-10-14
 ### Added

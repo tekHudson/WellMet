@@ -25,17 +25,17 @@ all: no messages, no settings, no minimap button. A single self buff is better s
 - Settings has a main page and three sections, customised on their own: **Self** (your own buffs; WellMet is
   just this if the other two are off), **Party / Raid** and **Others** (strangers, off until you turn it on; found
   through friendly nameplates and needs the key). Tick a section on the main page to switch it on and show its
-  page under WellMet; untick it and the page goes away. `/wellmet self`, `party` and `others` open each one. The main page has a button that writes the macro for you (`/wellmet macro`).
+  page under WellMet; untick it and the page goes away. `/wellmet self`, `party` and `others` open each one. Two more pages hold the extras: **Priority** (buff back first, refresh running-out buffs) and **Group tools** (the reminder icons, buff requests); `/wellmet priority` and `tools` open them. The main page has a button that writes the macro for you (`/wellmet macro`).
 - **Set all classes**: on the Party / Raid and Others pages, an icon per buff sits above the class table. Click one to give
   that buff to every class, click it again to clear them all (the red cross skips every class). A count like 4/9 shows when
   only some classes match, and you can still change a single class afterwards.
-- **Buff reminder** (main page, off by default): two small icons, **Self** and **Group** (party and raid together). An
+- **Buff reminder** (Group tools page, off by default): two small icons, **Self** and **Group** (party and raid together). An
   icon glows gold when the key would buff someone in it, goes dark with a green check when everyone is covered, and shows
   a grey ? when the game hides buffs (combat). "Show only when a buff is missing" draws an icon only while it needs one.
   Shift-drag moves them; `/wellmet strip` toggles them.
-- **Refresh running-out buffs** (main page, on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (slider, 10% to 90%). Someone missing a buff always comes first, then the most urgent refresh. It works on anyone's buffs, with one exception for Paladins: on you and your group only your own blessings are refreshed (a recast would replace another Paladin's), but on strangers anyone's blessing is.
-- **Buff back first** (main page, on by default): when another player puts a new buff on you, they go to the front of the list for 10 seconds. A key press in that time buffs them first, if they need a buff. Casters the game doesn't name are ignored, and nothing is tracked in combat.
-- **Buff requests** (main page, on by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
+- **Refresh running-out buffs** (Priority page, on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (slider, 10% to 90%). Someone missing a buff always comes first, then the most urgent refresh. It works on anyone's buffs, with one exception for Paladins: on you and your group only your own blessings are refreshed (a recast would replace another Paladin's), but on strangers anyone's blessing is.
+- **Buff back first** (Priority page, on by default): when another player puts a new buff on you, they go to the front of the list for 10 seconds. A key press in that time buffs them first, if they need a buff. Casters the game doesn't name are ignored, and nothing is tracked in combat.
+- **Buff requests** (Group tools page, on by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
   `!dampen`, `!amp` (Mage), `!motw`, `!thorns` (Druid) or `!fort`, `!spirit`, `!shadow` (Priest) in party or raid chat, or
   whisper it to you, and the key buffs them with that instead of their class default. `!none` means no buff from you and
   `!default` resets. Requests are remembered per player (and per caster class) until they change it or you clear it

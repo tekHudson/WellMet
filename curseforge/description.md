@@ -29,6 +29,8 @@ Tick the sections you want on the main settings page, and each one gets its own 
 
 ## Optional extras
 
+The extras live on two settings pages under WellMet: **Priority** and **Group tools**.
+
 - **Set all classes**: on the Party / Raid and Others pages, click a buff icon to give it to every class, or click it again to clear them all.
 - **Buff reminder**: two small icons, Self and Group, that glow when someone still needs a buff. Off by default (settings, *Buff reminder*); Shift-drag to move.
 - **Refresh running-out buffs** (on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (slider, 10% to 90%). Someone missing a buff always comes first, then the most urgent refresh. It works on anyone's buffs, with one exception for Paladins: on you and your group only your own blessings are refreshed (a recast would replace another Paladin's), but on strangers anyone's blessing is.
