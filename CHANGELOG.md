@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.2.2] - 2026-10-14
 ### Changed
 - The Self and Group reminder icons now use the same gold glow with a crawling edge that action buttons show for a proc, instead of a plain gold border.
 
