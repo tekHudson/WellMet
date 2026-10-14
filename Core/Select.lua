@@ -113,6 +113,7 @@ end
 local function before()
 	return function(a, b)
 		-- someone MISSING a buff comes before someone whose buff is merely running out; those go most urgent first
+		if (a.back ~= nil) ~= (b.back ~= nil) then return a.back ~= nil end      -- whoever just buffed you is first of all
 		local ra, rb = a.refresh, b.refresh
 		if (ra ~= nil) ~= (rb ~= nil) then return rb ~= nil end
 		if ra and rb and ra ~= rb then return ra < rb end
@@ -125,7 +126,7 @@ local function before()
 	end
 end
 
--- ctx = { now, settings, caster, probe, requests }   (requests: guid -> { buff } from chat, or nil when that feature is off)
+-- ctx = { now, settings, caster, probe, requests, back }   (back: guid -> record of who buffed you in the last 10 s, or nil)   (requests: guid -> { buff } from chat, or nil when that feature is off)
 -- cands: list of { unit, tier, key, name, class, order, ... }
 -- Returns: best (or nil), skipped = { { cand, reason, buff }, ... }, eligible (sorted).
 -- An entry is one (person, buff) pair: a stack-mode caster can have several per person.
@@ -137,6 +138,11 @@ function Select.Pick(cands, ctx)
 		local v = knownMemo[buff]
 		if v == nil then v = probe.known(buff) and true or false; knownMemo[buff] = v end
 		return v
+	end
+
+	-- Did this person just buff you? (ctx.back: guid -> record, the last 10 seconds)
+	local function backOf(cand)
+		return (ctx.back and cand.guid and ctx.back[cand.guid]) or nil
 	end
 
 	-- Is this buff on them but nearly gone? Returns the share of its time that is left (e.g. 0.12) when that is at or below
@@ -182,7 +188,7 @@ function Select.Pick(cands, ctx)
 		if reason then
 			skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
 		else
-			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge, refresh = share,
+			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge, refresh = share, back = backOf(cand),
 				note = share and string.format("refresh: %d%% of its time left", math.floor(share * 100 + 0.5)) or nil }
 		end
 	end
@@ -214,7 +220,7 @@ function Select.Pick(cands, ctx)
 		local reason, dist = whyNot(cand, chosen, cfg, true)
 		if reason then return skip(chosen, reason) end
 		if share then note = string.format("refresh: %d%% of its time left", math.floor(share * 100 + 0.5)) end
-		eligible[#eligible + 1] = { cand = cand, buff = chosen, dist = dist or math.huge, note = note, refresh = share }
+		eligible[#eligible + 1] = { cand = cand, buff = chosen, dist = dist or math.huge, note = note, refresh = share, back = backOf(cand) }
 	end
 
 	local function consider(cand)

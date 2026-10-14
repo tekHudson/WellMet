@@ -1938,6 +1938,77 @@ do
 end
 
 ----------------------------------------------------------------------
+print("== Buff back")
+do
+	local WM, ns, E, W = load()
+	local BB, f = ns.BuffBack, ns.buffBackFrame
+	check("on by default: it listens to UNIT_AURA on you", WM.db.buffBack.enabled == true and f.events.UNIT_AURA)
+	addUnit(W, "party1", { class = "WARRIOR", guid = "Player-w", name = "Wren", dist = 5 })
+	addUnit(W, "party2", { class = "MAGE", guid = "Player-m", name = "Mia", dist = 8 })
+	addUnit(W, "npc", { isPlayer = false, guid = "Creature-1", name = "Boss" })
+	W.groupSize = 2
+	local function aura(info) f.scripts.OnEvent(f, "UNIT_AURA", "player", info) end
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "party1", name = "Blessing of Kings" } } })
+	local set = BB.Active(W.now)
+	check("a new buff from a player notes the caster", set["Player-w"] ~= nil and set["Player-w"].name == "Wren")
+	check("...and the log says so", table.concat(ns.LogLines(), "\n"):find("buffed by Wren (Blessing of Kings)", 1, true) ~= nil)
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "player" } } })
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "npc" } } })
+	aura({ addedAuras = { { isHelpful = true } } })
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = SECRET } } })
+	aura({ addedAuras = { { isHelpful = false, sourceUnit = "party2" } } })
+	aura({ updatedAuraInstanceIDs = { 5 } })
+	aura(nil)
+	local n = 0 for _ in pairs(BB.Active(W.now)) do n = n + 1 end
+	check("ignored: your own buffs, NPCs, an unknown or secret caster, debuffs, and updates that add nothing", n == 1)
+	f.scripts.OnEvent(f, "UNIT_AURA", "party1", { addedAuras = { { isHelpful = true, sourceUnit = "party2" } } })
+	check("an aura on someone else is not ours to track", BB.Active(W.now)["Player-m"] == nil)
+	W.combat = true
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "party2" } } })
+	W.combat = false
+	check("nothing is tracked in combat", BB.Active(W.now)["Player-m"] == nil)
+
+	-- it puts them first
+	local Select = ns.Select
+	local function cand(key, tier, order, guid) return { unit = key, key = key, name = key, tier = tier, class = "MAGE", order = order, guid = guid } end
+	local probe = { known = function() return true end, inRange = function() return true end, lacks = function() return true end, distance = function() return nil end }
+	local cands = { cand("me", 0, 0, "Player-Tek"), cand("near", 1, 1, "Player-n"), cand("wren", 1, 2, "Player-w") }
+	local best = Select.Pick(cands, { now = W.now, settings = mkSettings({}), caster = WM.caster, probe = probe, back = BB.Active(W.now) })
+	check("whoever buffed you is first, ahead of you and the nearer group member", best.cand.key == "wren" and best.back ~= nil)
+	best = Select.Pick(cands, { now = W.now, settings = mkSettings({}), caster = WM.caster, probe = probe, back = {} })
+	check("without it the usual order holds (you first)", best.cand.key == "me")
+	local needy = { known = probe.known, inRange = probe.inRange, lacks = function(unit) return unit ~= "wren" end, distance = probe.distance }
+	best = Select.Pick(cands, { now = W.now, settings = mkSettings({}), caster = WM.caster, probe = needy, back = BB.Active(W.now) })
+	check("...but only if they need a buff: Wren already has it, so the usual order holds", best.cand.key == "me")
+
+	-- expiry and forgetting
+	check("10 seconds later they are forgotten", BB.Active(W.now + 11)["Player-w"] == nil)
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "party1" } } })
+	check("...a fresh buff starts the 10 seconds again", BB.Active(W.now + 5)["Player-w"] ~= nil)
+	BB.Forget("Player-w")
+	check("Forget removes them (used once the cast to them is sent)", BB.Active(W.now)["Player-w"] == nil)
+	check("a cast being sent forgets them", (function()
+		local src = readFile("Core/Cast.lua"); return src:find("ns.BuffBack.Forget(p.key)", 1, true) ~= nil
+	end)())
+
+	-- the press itself
+	addUnit(W, "party3", { class = "MAGE", guid = "Player-z", name = "Zed", dist = 3 })
+	addUnit(W, "party4", { class = "MAGE", guid = "Player-y", name = "Yan", dist = 20 })
+	W.groupSize = 4
+	W.spells["Blessing of Wisdom"] = 19742
+	WM.db.self.enabled = false
+	aura({ addedAuras = { { isHelpful = true, sourceUnit = "party4" } } })
+	local b = press(E)
+	check("a press within 10 seconds of Yan's buff goes to Yan, not the nearer Zed", b.attrs.unit == "party4")
+
+	-- setting off
+	WM.db.buffBack.enabled = false; WM:ApplyBuffBack()
+	check("switched off: it stops listening and nobody is first", not f.events.UNIT_AURA and BB.Active(W.now) == nil)
+	check("the main page has the Buff back checkbox", readFile("UI/Options.lua"):find("Buff back first", 1, true) ~= nil)
+	check("the report says who buffed you", (function() WM.db.buffBack.enabled = true; return WM:BuildReport():find("buffed you in the last 10s:", 1, true) ~= nil end)())
+end
+
+----------------------------------------------------------------------
 print("== Buff requests")
 do
 	local WM, ns, E, W = load()

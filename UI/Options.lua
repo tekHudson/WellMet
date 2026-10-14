@@ -583,7 +583,9 @@ local function buildMainPanel(subs)
 	makeHeader(panel, "Refresh running-out buffs", 16, y); y = y - 28
 	check("Rebuff people whose buff is nearly gone", function() return WM.db.refresh.enabled end,
 		function(v) WM.db.refresh.enabled = v and true or false end)
-	makeText(panel, "Someone missing a buff still comes first. Then the key refreshes buffs that have this much of their time left or less:", 24, y)
+	check("Buff back first: whoever just buffed you (last 10 seconds)", function() return WM.db.buffBack.enabled end,
+		function(v) WM.db.buffBack.enabled = v and true or false; WM:ApplyBuffBack() end)
+	makeText(panel, "Whoever buffed you comes first, then anyone missing a buff. After that the key refreshes buffs that have this much of their time left or less:", 24, y)
 	y = y - 30
 	local slider = makeSlider(panel, "WellMetRefreshSlider", 24, y, 10, 90, 10,
 		function() return WM.db.refresh.percent end, function(v) WM.db.refresh.percent = v end)

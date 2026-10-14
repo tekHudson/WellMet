@@ -22,6 +22,7 @@ Core\Spells.lua
 Core\Discovery.lua
 Core\Select.lua
 Core\Requests.lua
+Core\BuffBack.lua
 Core\Cast.lua
 Core\Macro.lua
 Core\Debug.lua

@@ -160,11 +160,11 @@ function WM:BuildReport()
 	section(out, "Right now (what a key press would see)", function(add)
 		local cands, rejected, info = ns.Discovery.Discover()
 		add(string.format("%d candidates, %d rejected, %d nameplates visible", #cands, #rejected, info.nameplates))
-		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
+		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active(), back = ns.BuffBack.Active(GetTime()) }
 		local best, skipped, eligible = ns.Select.Pick(cands, ctx)
 		for i, e in ipairs(eligible) do
-			add(string.format("  ELIGIBLE #%d  %s  -> %s  dist=%s%s%s", i, candLine(e.cand), e.buff.name,
-				e.dist == math.huge and "?" or S(e.dist), e.refresh and ("  (" .. e.note .. ")") or "", (e == best) and "   <== next press" or ""))
+			add(string.format("  ELIGIBLE #%d  %s  -> %s  dist=%s%s%s%s", i, candLine(e.cand), e.buff.name,
+				e.dist == math.huge and "?" or S(e.dist), e.refresh and ("  (" .. e.note .. ")") or "", e.back and ("  (buffed you " .. string.format("%.0f", GetTime() - e.back.at) .. "s ago: first)") or "", (e == best) and "   <== next press" or ""))
 		end
 		for _, s in ipairs(skipped) do
 			add(string.format("  skipped      %s  (%s)", candLine(s.cand), s.reason))
@@ -172,6 +172,10 @@ function WM:BuildReport()
 		for _, r in ipairs(rejected) do
 			add(string.format("  rejected     %-12s (%s)", S(r.unit), r.reason))
 		end
+		local back = ns.BuffBack.Active(GetTime())
+		local names = {}
+		for _, rec in pairs(back or {}) do names[#names + 1] = ns.SafeStr(rec.name) end
+		add("buffed you in the last " .. ns.BuffBack.SECONDS .. "s: " .. (#names > 0 and table.concat(names, ", ") or (back and "nobody" or "(buff back is off)")))
 		local recent = ns.Select.MemorySnapshot(GetTime())
 		add("recently tried: " .. (#recent > 0 and table.concat(recent, ", ") or "nobody"))
 	end)

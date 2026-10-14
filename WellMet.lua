@@ -10,6 +10,7 @@ Layout:
   Core/Spells.lua     spell/aura/range/distance probes (the only place that touches those APIs)
   Core/Discovery.lua  who is around: you, group, target, friendly nameplates
   Core/Select.lua     pure selection logic + "just tried" memory (unit-tested headless)
+  Core/BuffBack.lua   whoever just buffed you is buffed first for 10 seconds
   Core/Requests.lua   buff requests read from chat, remembered per player; the announce
   Core/Cast.lua       the secure button, PreClick pick, keybind, cast feedback
   Core/Debug.lua      /wellmet log: copyable state dump + event log
@@ -123,6 +124,7 @@ function WM:PLAYER_LOGIN()
 	WM:CreateStrip()
 	WM:ApplyChatProbe()
 	WM:ApplyRequests()
+	WM:ApplyBuffBack()
 
 	WM:RegisterEvent("SPELLS_CHANGED")
 	WM:RegisterEvent("NAME_PLATE_UNIT_ADDED")
