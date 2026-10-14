@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.2.0] - 2026-10-14
 ### Added
 - Buff back first (settings > Refresh running-out buffs, on by default): when another player puts a new buff on you, they go to the front of the list for 10 seconds. A key press in that time buffs them first, if they need a buff. Only new buffs count, and only when the game says who cast them (an unknown caster is ignored); nothing is tracked in combat. `/wellmet log` shows who buffed you in the last 10 seconds.
 - Refresh running-out buffs (settings > Refresh running-out buffs, on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (10% to 90% slider). Someone missing a buff always comes first, then the most urgent refresh. Works for anyone's buffs, strangers included. For a Paladin, only your own blessings are refreshed on you and your group (a recast would replace another Paladin's), but on strangers (Others) anyone's blessing is refreshed. The Self and Group reminder icons count a buff that is running out as needing one, and `/wellmet log` marks refreshes in the eligible list.
