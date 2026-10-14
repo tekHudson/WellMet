@@ -1,6 +1,6 @@
 --[[ WellMet — the reminder strip: two action-button style icons, Self and Group, that say who still needs a buff.
 
-An icon is lit (gold glowing edge) when someone it stands for needs a buff the key would cast right now (same rules
+An icon is lit (the action-button proc glow: gold, with a crawling edge) when someone it stands for needs a buff the key would cast right now (same rules
 as a key press: in range, learned, section on, not just tried). Dark with a green check = everyone is covered.
 Dark with a grey ? = can't tell (Forever hides other players' buffs in combat). Group is your party and your raid
 together. An icon whose section is switched off (or Group when you are not in a group) is not drawn. Strangers
@@ -23,7 +23,6 @@ local CHIPS = {
 	{ key = "group", label = "Group", icon = "Interface\\Icons\\INV_Misc_GroupNeedMore" },
 }
 local CHECK_TEXTURE = "Interface\\RaidFrame\\ReadyCheck-Ready"
-local GLOW_TEXTURE  = "Interface\\Buttons\\UI-ActionButton-Border"
 
 -- The icons to show and what each says. Returns a list of { key, label, count, state }:
 --   state "need" (count people need a buff), "ok" (nobody does), "unknown" (can't tell right now).
@@ -108,12 +107,6 @@ local function build()
 		icon:SetPoint("TOPLEFT", 2, -2); icon:SetPoint("BOTTOMRIGHT", -2, 2)
 		icon:SetTexture(chip.icon)
 		icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-		local glow = f:CreateTexture(nil, "OVERLAY")
-		glow:SetPoint("CENTER")
-		glow:SetSize(SIZE * 1.85, SIZE * 1.85)
-		glow:SetTexture(GLOW_TEXTURE)
-		glow:SetBlendMode("ADD")
-		glow:SetVertexColor(1, 0.8, 0.25)
 		local check = f:CreateTexture(nil, "OVERLAY")
 		check:SetPoint("CENTER")
 		check:SetSize(SIZE * 0.6, SIZE * 0.6)
@@ -122,7 +115,7 @@ local function build()
 		mark:SetPoint("CENTER")
 		mark:SetText("?")
 		mark:SetTextColor(0.75, 0.75, 0.75)
-		chips[chip.key] = { frame = f, icon = icon, glow = glow, check = check, mark = mark }
+		chips[chip.key] = { frame = f, icon = icon, check = check, mark = mark }
 	end
 	-- The timer lives on its own frame: the strip itself is hidden whenever there is nothing to draw, and a hidden
 	-- frame gets no OnUpdate, so it could never come back.
@@ -145,7 +138,10 @@ function WM:RefreshStrip()
 		local need, ok = m.state == "need", m.state == "ok"
 		c.frame:ClearAllPoints()
 		c.frame:SetPoint("TOPLEFT", strip, "TOPLEFT", (i - 1) * (SIZE + GAP), 0)
-		c.glow:SetShown(need)
+		if c.lit ~= need then          -- the action-button proc glow (gold, crawling edge); only touched when the state flips
+			c.lit = need
+			if need then ActionButtonSpellAlertManager:ShowAlert(c.frame) else ActionButtonSpellAlertManager:HideAlert(c.frame) end
+		end
 		c.icon:SetDesaturated(not need)
 		c.icon:SetVertexColor(need and 1 or 0.4, need and 1 or 0.4, need and 1 or 0.4)
 		c.check:SetShown(ok)

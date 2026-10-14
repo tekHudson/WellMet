@@ -29,4 +29,3 @@ Core\Debug.lua
 UI\Options.lua
 UI\Minimap.lua
 UI\Strip.lua
-UI\GlowTest.lua
