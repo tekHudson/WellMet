@@ -2119,7 +2119,7 @@ do
 	check("in an instance group it goes to INSTANCE_CHAT", W.sentChat[1].channel == "INSTANCE_CHAT")
 	W.chatLockdown = true; W.sentChat = nil
 	WM:Announce()
-	check("during a chat lockdown it sends nothing and says why", W.sentChat == nil and printed(W, "Can't announce right now"))
+	check("during a chat lockdown it sends nothing (the line goes to the chat box, quietly)", W.sentChat == nil)
 	check("...and puts the line in the chat box for you to send", W.chatBox and W.chatBox:find("/i WellMet:", 1, true) == 1 and W.chatBox:find("!bom", 1, true) ~= nil)
 	W.chatBox = nil
 	E.g.C_ChatInfo.AreOutgoingAddonChatMessagesRestricted = function() return true end

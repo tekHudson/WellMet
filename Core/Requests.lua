@@ -155,7 +155,6 @@ function WM:Announce()
 		local slash = ({ PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i " })[channel]
 		WM:Log("announce: addon chat is blocked, so the line goes into your chat box instead")
 		ChatFrameUtil.OpenChat(slash .. Requests.AnnounceText(WM.caster))      -- ChatFrame_OpenChat is a deprecated alias of this
-		WM:Print("Can't announce right now: the game doesn't let addons send chat here. The line is in your chat box: press Enter to send it.")
 		return false
 	end
 	local send = C_ChatInfo.SendChatMessage or SendChatMessage

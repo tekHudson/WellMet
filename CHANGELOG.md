@@ -6,7 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Changed
-- Announce, when the game blocks addon chat, now fills your chat box with `ChatFrameUtil.OpenChat`; the old `ChatFrame_OpenChat` name is a deprecated alias that Blizzard says will be removed.
+- Announce, when the game blocks addon chat, now fills your chat box with `ChatFrameUtil.OpenChat`; the old `ChatFrame_OpenChat` name is a deprecated alias that Blizzard says will be removed. The "Can't announce right now" chat message is gone, since the chat box filling in is the sign it worked (it is still in `/wellmet log`).
 
 ## [1.2.2] - 2026-10-14
 ### Changed
