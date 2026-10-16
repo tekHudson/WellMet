@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Changed
+- Announce, when the game blocks addon chat, now fills your chat box with `ChatFrameUtil.OpenChat`; the old `ChatFrame_OpenChat` name is a deprecated alias that Blizzard says will be removed.
 
 ## [1.2.2] - 2026-10-14
 ### Changed

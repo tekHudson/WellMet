@@ -154,12 +154,8 @@ function WM:Announce()
 		-- put the line in your chat box instead, and you press Enter, which the game allows.
 		local slash = ({ PARTY = "/p ", RAID = "/raid ", INSTANCE_CHAT = "/i " })[channel]
 		WM:Log("announce: addon chat is blocked, so the line goes into your chat box instead")
-		if ChatFrame_OpenChat then
-			ChatFrame_OpenChat(slash .. Requests.AnnounceText(WM.caster))
-			WM:Print("Can't announce right now: the game doesn't let addons send chat here. The line is in your chat box: press Enter to send it.")
-		else
-			WM:Print("Can't announce right now: the game doesn't let addons send chat here. Type this yourself: " .. slash .. Requests.AnnounceText(WM.caster))
-		end
+		ChatFrameUtil.OpenChat(slash .. Requests.AnnounceText(WM.caster))      -- ChatFrame_OpenChat is a deprecated alias of this
+		WM:Print("Can't announce right now: the game doesn't let addons send chat here. The line is in your chat box: press Enter to send it.")
 		return false
 	end
 	local send = C_ChatInfo.SendChatMessage or SendChatMessage

@@ -86,7 +86,7 @@ local function newEnv(W)
 	g.IsInGroup = function(cat) if cat then return W.instanceGroup or false end return W.groupSize > 0 end
 	g.GetPlayerInfoByGUID = function(guid) return nil, (W.guidClass or {})[guid] end
 	g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
-	g.ChatFrame_OpenChat = function(text) W.chatBox = text end
+	g.ChatFrameUtil = { OpenChat = function(text) W.chatBox = text end }
 	g.ActionButtonSpellAlertManager = { ShowAlert = function(_, f) W.alerts = W.alerts or {}; W.alerts[f] = true end, HideAlert = function(_, f) if W.alerts then W.alerts[f] = nil end end }
 	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
 	g.IsAltKeyDown = function() return false end
