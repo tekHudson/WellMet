@@ -1909,6 +1909,18 @@ do
 	best = Select.Pick({ cand("p", 2) }, { now = 100, settings = settings(), caster = pal, probe = probe({ has = { p = true }, state = { p = "other" }, share = { p = 0.05 } }) })
 	check("Paladin: on strangers (Others) another Paladin's blessing is refreshed", best ~= nil and best.refresh == 0.05)
 
+	-- your hand-picked target is buffed whatever time is left
+	local function tcand(key, tier, order) local c = cand(key, tier, order); c.targeted = true; return c end
+	local function tsettings(on) local st = settings(); st.castOnTarget = { enabled = on }; return st end
+	best = Select.Pick({ tcand("t", 1) }, { now = 100, settings = tsettings(true), caster = WM.caster, probe = probe({ has = { t = true }, share = { t = 0.9 } }) })
+	check("a targeted player with 90% left is still buffed", best ~= nil and best.forced == true)
+	best = Select.Pick({ tcand("t", 1) }, { now = 100, settings = tsettings(false), caster = WM.caster, probe = probe({ has = { t = true }, share = { t = 0.9 } }) })
+	check("switched off: a targeted player with time left is left alone", best == nil)
+	best = Select.Pick({ cand("m", 1, 1), tcand("t", 2, 2) }, { now = 100, settings = tsettings(true), caster = WM.caster, probe = probe({ has = { t = true }, share = { t = 0.9 } }) })
+	check("the target goes before someone missing a buff", best.cand.key == "t")
+	best = Select.Pick({ tcand("t", 2) }, { now = 100, settings = tsettings(true), caster = pal, probe = probe({ has = { t = true }, state = { t = "other" }, share = { t = 0.9 } }) })
+	check("Paladin: a targeted stranger gets the main blessing over another's", best ~= nil and best.forced == true)
+
 	-- the real aura reader
 	local WM2, ns2, E2, W2 = load({ class = "MAGE" })
 	W2.spells["Arcane Intellect"] = 1459; W2.known[1459] = true

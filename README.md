@@ -35,6 +35,7 @@ all: no messages, no settings, no minimap button. A single self buff is better s
   Shift-drag moves them; `/wellmet strip` toggles them.
 - **Refresh running-out buffs** (Priority page, on by default at 20%): once nobody nearby is missing a buff, the key recasts buffs that have the chosen share of their time left or less (slider, 10% to 90%). Someone missing a buff always comes first, then the most urgent refresh. It works on anyone's buffs, with one exception for Paladins: on you and your group only your own blessings are refreshed (a recast would replace another Paladin's), but on strangers anyone's blessing is.
 - **Buff back first** (Priority page, on by default): when another player puts a new buff on you, they go to the front of the list for 10 seconds. A key press in that time buffs them first, if they need a buff. Casters the game doesn't name are ignored, and nothing is tracked in combat.
+- **Buff my target** (Priority page, on by default): target someone yourself and press the key, and they are buffed first whatever time their buff has left. A Paladin replaces another's blessing this way, with the class's main blessing. The reminder icons ignore this.
 - **Buff requests** (Group tools page, on by default): players say `!bom`, `!bow`, `!bok`, `!bos`, `!bol` (Paladin), `!ai`,
   `!dampen`, `!amp` (Mage), `!motw`, `!thorns` (Druid) or `!fort`, `!spirit`, `!shadow` (Priest) in party or raid chat, or
   whisper it to you, and the key buffs them with that instead of their class default. `!none` means no buff from you and

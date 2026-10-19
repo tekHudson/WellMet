@@ -604,6 +604,13 @@ local function buildPriorityPanel()
 	makeText(panel, "When another player puts a new buff on you, a key press in the next 10 seconds buffs them first, if they need one.", 24, y)
 	y = y - 40
 
+	makeHeader(panel, "Your target", 16, y); y = y - 28
+	row = checkRows(panel, y)
+	y = row("Buff my target even if their buff has time left", function() return WM.db.castOnTarget.enabled end,
+		function(v) WM.db.castOnTarget.enabled = v and true or false end)
+	makeText(panel, "Target someone yourself and press the key: they are buffed first, whatever time their buff has left (a Paladin replaces another's blessing).", 24, y)
+	y = y - 40
+
 	makeHeader(panel, "Refresh running-out buffs", 16, y); y = y - 28
 	row = checkRows(panel, y)
 	y = row("Rebuff people whose buff is nearly gone", function() return WM.db.refresh.enabled end,

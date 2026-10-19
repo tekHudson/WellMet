@@ -22,6 +22,7 @@ local DEFAULTS = {
 	minimap      = { hide = false, angle = 200 },   -- minimap button: hidden?, position around the minimap (degrees)
 	strip        = { enabled = false, onlyWhenMissing = false, point = "TOP", x = 0, y = -140 },   -- the Self / Group reminder strip: shown?, draw only the icons that need a buff?, where
 	refresh      = { enabled = true, percent = 20 },   -- buff people whose buff is running out: when this share of its time is left
+	castOnTarget = { enabled = true },    -- a player you target by hand is buffed even if their buff has plenty of time left
 	buffBack     = { enabled = true },    -- whoever just buffed you (last 10 s) is buffed first, if they need it
 	requests     = { enabled = true, list = {} },    -- what players asked for in chat: list[casterClass][guid] = { buff, name, class, at }
 	debug        = false,      -- record the /wellmet log and show press-time chat messages

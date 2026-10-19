@@ -112,6 +112,7 @@ end
 -- You, then your group, then everyone else; nearest first within each.
 local function before()
 	return function(a, b)
+		if (a.forced ~= nil) ~= (b.forced ~= nil) then return a.forced ~= nil end      -- your hand-picked target is first of all
 		-- someone MISSING a buff comes before someone whose buff is merely running out; those go most urgent first
 		if (a.back ~= nil) ~= (b.back ~= nil) then return a.back ~= nil end      -- whoever just buffed you is first of all
 		local ra, rb = a.refresh, b.refresh
@@ -184,8 +185,19 @@ function Select.Pick(cands, ctx)
 		return nil, dist
 	end
 
+	-- Your hand-picked target gets the buff whatever time it has left (setting "castOnTarget").
+	local function isForced(cand)
+		return cand.targeted and settings.castOnTarget and settings.castOnTarget.enabled
+	end
+	local FORCED_NOTE = "your target: cast regardless of time left"
+
 	local function add(cand, buff, cfg)
-		local reason, dist, share = whyNot(cand, buff, cfg)
+		local forced = isForced(cand)
+		local reason, dist, share = whyNot(cand, buff, cfg, forced)
+		if forced and not reason then
+			eligible[#eligible + 1] = { cand = cand, buff = buff, dist = dist or math.huge, forced = true, back = backOf(cand), note = FORCED_NOTE }
+			return
+		end
 		if reason then
 			skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff }
 		else
@@ -260,7 +272,8 @@ function Select.Pick(cands, ctx)
 			skipped[#skipped + 1] = { cand = cand, reason = why }
 			return
 		end
-		if cand.tier == 2 and ctx.caster.mode == "assign" then
+		if isForced(cand) and ctx.caster.mode == "assign" then buffs = { buffs[1] } end     -- one blessing: the class's main one
+		if cand.tier == 2 and not isForced(cand) and ctx.caster.mode == "assign" then
 			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])
 			if secondary then return considerPair(cand, buffs[1], secondary, cfg) end
 		end

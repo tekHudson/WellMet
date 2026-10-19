@@ -36,7 +36,7 @@ function ns.StripModel()
 	local people = { self = {}, group = {} }
 	if readable then
 		local cands = ns.Discovery.Discover({ groupOnly = true })
-		local ctx = { now = GetTime(), settings = db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
+		local ctx = { now = GetTime(), settings = setmetatable({ castOnTarget = { enabled = false } }, { __index = db }), caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active() }
 		local _, _, eligible = ns.Select.Pick(cands, ctx)
 		for _, e in ipairs(eligible) do
 			people[e.cand.tier == 0 and "self" or "group"][e.cand.key] = true
