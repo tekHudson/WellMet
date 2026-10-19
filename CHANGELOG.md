@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.3.0] - 2026-10-18
 ### Added
 - Buff my target (Priority page, on by default): a player you target by hand is buffed first, whatever time their buff has left. A Paladin replaces another's blessing with the class's main one. The reminder icons are unaffected.
 
