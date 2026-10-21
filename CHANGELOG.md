@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Changed
+- Don't buff PvP-flagged players now only applies while you are not PvP flagged yourself. Once you are flagged, they are buffed as usual.
 
 ## [1.4.0] - 2026-10-21
 ### Added

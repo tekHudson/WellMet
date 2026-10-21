@@ -50,6 +50,7 @@ Everywhere below, **"paste the log"** = `/wellmet log` → click in the text →
 - **Radius**: cycle Cast range → 28 → 10 yd; with a stranger ~20 yd away, 10 yd should skip them.
 - **Assignments**: set Warrior → Wisdom / Skip; press near a warrior: matches. Set an unreadable-class default.
 - **Group first** off, **Buff myself** off: behave as labelled.
+- **Don't buff PvP-flagged players, unless I'm flagged** (on): with yourself unflagged, a flagged player is skipped (`/wellmet log` says "PvP flagged (and you are not)"); flag yourself and the same player is buffed; untick the setting and flagged players are buffed again. Not yet tried in game.
 
 ## T6 — Failures (A8)
 - Stand so a player is behind a wall: the cast fails with line of sight; the **next press must go to someone else**

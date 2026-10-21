@@ -417,23 +417,28 @@ do
 	check("reports how many nameplates it saw", info.nameplates == 5)
 	check("group order follows the roster index", byName.Wally.order == 1 and byName.Mia.order == 2)
 
-	-- PvP-flagged players are left out (setting on by default); you are never skipped; off lets them through
+	-- PvP-flagged players are left out while you are not flagged (setting on by default); you are never skipped
 	addUnit(W, "party3", { class = "PALADIN", name = "Flagged", guid = "G-flagged", pvp = true })
 	addUnit(W, "nameplate11", { class = "MAGE", name = "FlaggedStranger", guid = "G-fs", pvp = true })
 	W.plates = { "nameplate11" }
+	local function names()
+		local out = {}
+		for _, c in ipairs(D.Discover()) do out[c.name] = c end
+		return out
+	end
+	byName = names()
+	check("you not flagged: flagged group members and strangers are rejected, you are kept", byName.Flagged == nil and byName.FlaggedStranger == nil and byName.Tek ~= nil)
+	local _, rej = D.Discover()
+	check("the rejection says PvP flagged", (function() for _, r in ipairs(rej) do if r.reason:find("PvP flagged", 1, true) then return true end end end)())
 	W.units.player.pvp = true
-	list, rejected = D.Discover()
-	byName = {}
-	for _, c in ipairs(list) do byName[c.name] = c end
-	check("PvP-flagged group members and strangers are rejected, you are kept", byName.Flagged == nil and byName.FlaggedStranger == nil and byName.Tek ~= nil)
-	check("the rejection says PvP flagged", (function() for _, r in ipairs(rejected) do if r.reason == "PvP flagged" then return true end end end)())
+	byName = names()
+	check("you flagged: flagged players are buffed as usual", byName.Flagged ~= nil and byName.FlaggedStranger ~= nil and byName.Tek ~= nil)
+	W.units.player.pvp = nil
 	WM.db.skipPvP = false
-	list = D.Discover()
-	byName = {}
-	for _, c in ipairs(list) do byName[c.name] = c end
+	byName = names()
 	check("with the setting off, flagged players are candidates again", byName.FlaggedStranger ~= nil)
 	WM.db.skipPvP = true
-	W.units.player.pvp = nil; W.units.party3 = nil
+	W.units.party3 = nil
 
 	-- secret identity is treated as unknown
 	addUnit(W, "nameplate6", { class = "MAGE", name = "Hidden", secretGuid = true, secretClass = true })

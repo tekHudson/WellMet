@@ -74,7 +74,7 @@ local function describe(unit, tier, plate)
 	if not UnitIsPlayer(unit) then return nil, "not a player" end
 	if not UnitCanAssist("player", unit) then return nil, "can't assist" end
 	if UnitIsDeadOrGhost(unit) then return nil, "dead" end
-	if tier ~= 0 and WM.db.skipPvP and safe(UnitIsPVP(unit)) then return nil, "PvP flagged" end
+	if tier ~= 0 and WM.db.skipPvP and safe(UnitIsPVP(unit)) and not safe(UnitIsPVP("player")) then return nil, "PvP flagged (and you are not)" end
 	if tier == 1 and not UnitIsConnected(unit) then return nil, "offline" end
 	if not UnitIsVisible(unit) then return nil, "not visible" end
 	local guid = safe(UnitGUID(unit))
