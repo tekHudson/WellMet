@@ -19,6 +19,7 @@ ns.SECTION_OF_TIER = { [0] = "self", [1] = "party", [2] = "others" }
 local DEFAULTS = {
 	schema       = 2,
 	allowMounted = false,      -- refuse to cast while mounted (casting would dismount you)
+	skipPvP      = true,       -- never buff a PvP-flagged player (buffing one flags you for PvP too)
 	minimap      = { hide = false, angle = 200 },   -- minimap button: hidden?, position around the minimap (degrees)
 	strip        = { enabled = false, onlyWhenMissing = false, point = "TOP", x = 0, y = -140 },   -- the Self / Group reminder strip: shown?, draw only the icons that need a buff?, where
 	refresh      = { enabled = true, percent = 20 },   -- buff people whose buff is running out: when this share of its time is left

@@ -561,6 +561,7 @@ local function buildMainPanel(subs)
 		y = y - 26
 	end
 	check("Allow casting while mounted (dismounts you)", function() return WM.db.allowMounted end, function(v) WM.db.allowMounted = v and true or false end)
+	check("Don't buff PvP-flagged players", function() return WM.db.skipPvP end, function(v) WM.db.skipPvP = v and true or false end)
 	check("Show the minimap button", function() return not WM.db.minimap.hide end,
 		function(v) WM.db.minimap.hide = not v; if WM.minimap then WM.minimap:SetShown(v) end end)
 	y = y - 6

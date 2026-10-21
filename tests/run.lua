@@ -42,7 +42,7 @@ local function addUnit(W, unit, opts)
 		guid = opts.guid or ("Player-" .. unit), name = opts.name or unit, class = opts.class,
 		distSq = opts.dist and opts.dist * opts.dist or nil, checked = opts.dist ~= nil,
 		interact = opts.interact, auras = opts.auras or {}, inRange = (opts.inRange == nil) and true or opts.inRange,
-		secretGuid = opts.secretGuid, secretClass = opts.secretClass,
+		secretGuid = opts.secretGuid, secretClass = opts.secretClass, pvp = opts.pvp,
 	}
 	return W.units[unit]
 end
@@ -137,6 +137,7 @@ local function newEnv(W)
 	g.UnitExists = function(u) return U(u) ~= nil and U(u).exists end
 	g.UnitIsPlayer = function(u) return U(u) and U(u).isPlayer end
 	g.UnitCanAssist = function(_, u) return U(u) and U(u).canAssist end
+	g.UnitIsPVP = function(u) return U(u) and U(u).pvp end
 	g.UnitIsDeadOrGhost = function(u) return U(u) and U(u).dead end
 	g.UnitIsConnected = function(u) return U(u) and U(u).connected end
 	g.UnitIsVisible = function(u) return U(u) and U(u).visible end
@@ -415,6 +416,24 @@ do
 	check("non-players, hostiles and dead players are rejected", not byName.Boar and not byName.EnemyPlayer and not byName.Ghost and #rejected >= 3)
 	check("reports how many nameplates it saw", info.nameplates == 5)
 	check("group order follows the roster index", byName.Wally.order == 1 and byName.Mia.order == 2)
+
+	-- PvP-flagged players are left out (setting on by default); you are never skipped; off lets them through
+	addUnit(W, "party3", { class = "PALADIN", name = "Flagged", guid = "G-flagged", pvp = true })
+	addUnit(W, "nameplate11", { class = "MAGE", name = "FlaggedStranger", guid = "G-fs", pvp = true })
+	W.plates = { "nameplate11" }
+	W.units.player.pvp = true
+	list, rejected = D.Discover()
+	byName = {}
+	for _, c in ipairs(list) do byName[c.name] = c end
+	check("PvP-flagged group members and strangers are rejected, you are kept", byName.Flagged == nil and byName.FlaggedStranger == nil and byName.Tek ~= nil)
+	check("the rejection says PvP flagged", (function() for _, r in ipairs(rejected) do if r.reason == "PvP flagged" then return true end end end)())
+	WM.db.skipPvP = false
+	list = D.Discover()
+	byName = {}
+	for _, c in ipairs(list) do byName[c.name] = c end
+	check("with the setting off, flagged players are candidates again", byName.FlaggedStranger ~= nil)
+	WM.db.skipPvP = true
+	W.units.player.pvp = nil; W.units.party3 = nil
 
 	-- secret identity is treated as unknown
 	addUnit(W, "nameplate6", { class = "MAGE", name = "Hidden", secretGuid = true, secretClass = true })
