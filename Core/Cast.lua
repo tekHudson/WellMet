@@ -131,6 +131,14 @@ function WM:OnPress(b, fromMacro)
 		WM:Log("press blocked: stranger " .. ns.SafeStr(cand.name) .. " from a /click macro")
 		return
 	end
+	-- A target too low level for your highest rank gets a lower one (the name alone always casts the highest).
+	local level = UnitLevel(cand.unit)
+	local rank = ns.RankFor(buff, level, cand.key)
+	local ranks = ns.Ranks(buff.name)
+	local rankLevel = rank and rank.level or (ranks[1] and ranks[1].level)
+	if rank then
+		WM:Log("rank: target level " .. ns.SafeStr(level) .. " is too low for " .. buff.name .. " " .. ns.SafeStr(ranks[1] and ranks[1].sub) .. ", casting " .. ns.SafeStr(rank.sub) .. " (id " .. rank.id .. ")")
+	end
 	if cand.fullName then
 		-- A `nameplateN` unit token can't be cast on or targeted from here: the client silently
 		-- drops it (no event, no error), as a spell attribute, a [@nameplateN] conditional and
@@ -138,13 +146,13 @@ function WM:OnPress(b, fromMacro)
 		-- NearbyBuff does it); /cleartarget first so a failed lookup can't cast on your old target.
 		b:SetAttribute("type", "macro")
 		b:SetAttribute("macrotext", "/stopmacro [combat]\n/cleartarget\n/targetexact " .. cand.fullName
-			.. "\n/cast [@target,exists,help,nodead] " .. buff.name)
+			.. "\n/cast [@target,exists,help,nodead] " .. buff.name .. (rank and rank.sub and rank.sub ~= "" and ("(" .. rank.sub .. ")") or ""))
 	else
 		b:SetAttribute("type", "spell")
-		b:SetAttribute("spell", buff.name)
+		b:SetAttribute("spell", rank and rank.id or buff.name)      -- by id for a lower rank; CastSpellByID takes the id
 		b:SetAttribute("unit", cand.unit)
 	end
-	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now }
+	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now, rankLevel = rankLevel }
 	WM:Log("press: armed", buff.name, "on", cand.name, "(" .. cand.unit .. ",", "tier " .. cand.tier .. ",",
 		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")" .. (best.note and (" - " .. best.note) or ""))
 end
@@ -197,6 +205,7 @@ end)
 local function failureKind(message)
 	if message == nil then return nil end
 	if message == _G.SPELL_FAILED_AURA_BOUNCED then return "stronger" end
+	if _G.SPELL_FAILED_LOWLEVEL and message == _G.SPELL_FAILED_LOWLEVEL then return "lowlevel" end
 	if message == _G.SPELL_FAILED_LINE_OF_SIGHT or message == _G.SPELL_FAILED_VISION_OBSCURED then return "los" end
 	if message == _G.SPELL_FAILED_OUT_OF_RANGE or message == _G.ERR_OUT_OF_RANGE then return "range" end
 	return nil
@@ -235,7 +244,21 @@ local function onError(_, message)
 	local kind = failureKind(message)
 	if not p or not kind then return end
 	local seconds = FAILED_SECONDS
-	if kind == "stronger" then
+	if kind == "lowlevel" then
+		-- the rank was too high for them: remember that, and let the next press try the next rank down
+		local lower = false
+		for _, rank in ipairs(ns.Ranks(p.spell)) do
+			if p.rankLevel and rank.level < p.rankLevel then lower = true end
+			if rank.level == p.rankLevel then ns.RankRefused(p.key, p.spell, rank) end
+		end
+		if lower then
+			ns.Select.Mark(p.key, p.spell, 0)
+			WM:Log("cast failed:", ns.SafeStr(message), "-> a lower rank of " .. p.spell .. " will be tried on " .. ns.SafeStr(p.name))
+			WM.pending = nil
+			return
+		end
+		seconds = STRONGER_SECONDS
+	elseif kind == "stronger" then
 		seconds = STRONGER_SECONDS
 	else
 		if kind == "los" then seconds = LOS_SECONDS end

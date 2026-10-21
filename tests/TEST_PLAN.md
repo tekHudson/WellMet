@@ -49,6 +49,7 @@ Everywhere below, **"paste the log"** = `/wellmet log` → click in the text →
 ## T5 — Settings
 - **Radius**: cycle Cast range → 28 → 10 yd; with a stranger ~20 yd away, 10 yd should skip them.
 - **Assignments**: set Warrior → Wisdom / Skip; press near a warrior: matches. Set an unreadable-class default.
+- **Low-level target** (Mage, Arcane Intellect Rank 3): press on a level 10 player. Expect Rank 2 (or 1), log line "rank: target level 10 is too low ...". If the game refuses, the log says "a lower rank ... will be tried" and the next press steps down. Not yet tried in game.
 - **Group first** off, **Buff myself** off: behave as labelled.
 - **Don't buff PvP-flagged players, unless I'm flagged** (on): with yourself unflagged, a flagged player is skipped (`/wellmet log` says "PvP flagged (and you are not)"); flag yourself and the same player is buffed; untick the setting and flagged players are buffed again. Not yet tried in game.
 

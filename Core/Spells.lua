@@ -38,8 +38,76 @@ function ns.IsKnown(buff)
 	return id ~= nil and C_SpellBook.IsSpellKnown(id) and true or false
 end
 
+----------------------------------------------------------------------
+-- Ranks (casting a lower rank on a low-level target)
+--   A buff cast by name goes out as your highest rank, and the game refuses it on a target that is too low level
+--   (the spellbook / action bar pick a lower rank by themselves; a name cast does not). So the learned ranks are read from
+--   the spellbook (each entry has its own spell id, "Rank N" text and the level it is learned at: /wellmet ranks shows
+--   them) and a lower one is cast by id when the target is too low.
+----------------------------------------------------------------------
+-- A rank can be cast on a target whose level is at least (the level the rank is learned at) minus this. Only a best guess
+-- from Classic: a refused cast (SPELL_FAILED_LOWLEVEL) steps down one more rank, see Core/Cast.lua.
+ns.RANK_LEVEL_GAP = 10
+
+local rankCache = {}      -- buff name -> list of { id, sub, level }, highest level first
+
+local function readable(v) return v ~= nil and not issecretvalue(v) end
+
+-- Every learned rank of `name`, highest first (empty list when the spellbook can't be read).
+function ns.Ranks(name)
+	local list = rankCache[name]
+	if list then return list end
+	list = {}
+	pcall(function()
+		for line = 1, C_SpellBook.GetNumSpellBookSkillLines() do
+			local info = C_SpellBook.GetSpellBookSkillLineInfo(line)
+			for slot = info.itemIndexOffset + 1, info.itemIndexOffset + info.numSpellBookItems do
+				local item = C_SpellBook.GetSpellBookItemInfo(slot, Enum.SpellBookSpellBank.Player)
+				if item and item.name == name and not item.isPassive then
+					local id = item.spellID or item.actionID
+					local level = C_Spell.GetSpellLevelLearned(id)
+					if readable(id) and readable(level) and C_SpellBook.IsSpellKnown(id) then
+						list[#list + 1] = { id = id, sub = item.subName, level = level }
+					end
+				end
+			end
+		end
+	end)
+	table.sort(list, function(a, b) return a.level > b.level end)
+	rankCache[name] = list
+	return list
+end
+
+-- A rank that failed on a target ("too low level"): never try that rank or a higher one on them again this session.
+local tooHigh = {}      -- "key|name" -> the level of the lowest rank refused so far
+
+function ns.RankRefused(key, name, rank) tooHigh[key .. "|" .. name] = rank.level end
+function ns.RankReset() for k in pairs(tooHigh) do tooHigh[k] = nil end end
+
+-- The rank to cast on a target, or nil to cast the plain name (the highest rank, as before): when the level of the target
+-- is unknown, there is only one rank, or the highest rank already fits.
+-- Returns the rank, and true when it is not the highest one.
+function ns.RankFor(buff, targetLevel, targetKey)
+	if not readable(targetLevel) or type(targetLevel) ~= "number" or targetLevel < 1 then return nil end
+	local ranks = ns.Ranks(buff.name)
+	if #ranks < 2 then return nil end
+	local refused = tooHigh[(targetKey or "") .. "|" .. buff.name]
+	local chosen
+	for _, rank in ipairs(ranks) do
+		if (not refused or rank.level < refused) and rank.level - ns.RANK_LEVEL_GAP <= targetLevel then chosen = rank; break end
+	end
+	if not chosen then      -- nothing fits: the lowest rank not refused yet
+		for i = #ranks, 1, -1 do
+			if not refused or ranks[i].level < refused then chosen = ranks[i]; break end
+		end
+	end
+	if not chosen or chosen == ranks[1] then return nil end
+	return chosen, true
+end
+
 -- Re-resolve ids for the caster's buffs (login, and when spells change).
 function WM:InitSpells()
+	for k in pairs(rankCache) do rankCache[k] = nil end
 	for _, key in ipairs(WM.caster.all) do
 		local buff = WM.caster.buffs[key]
 		buff.id = ns.SpellId(buff)

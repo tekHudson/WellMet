@@ -40,7 +40,7 @@ local function addUnit(W, unit, opts)
 		exists = true, isPlayer = opts.isPlayer ~= false, canAssist = opts.canAssist ~= false,
 		dead = opts.dead or false, connected = opts.connected ~= false, visible = opts.visible ~= false,
 		guid = opts.guid or ("Player-" .. unit), name = opts.name or unit, class = opts.class,
-		distSq = opts.dist and opts.dist * opts.dist or nil, checked = opts.dist ~= nil,
+		level = opts.level, distSq = opts.dist and opts.dist * opts.dist or nil, checked = opts.dist ~= nil,
 		interact = opts.interact, auras = opts.auras or {}, inRange = (opts.inRange == nil) and true or opts.inRange,
 		secretGuid = opts.secretGuid, secretClass = opts.secretClass, pvp = opts.pvp,
 	}
@@ -1333,6 +1333,70 @@ do
 	check("picking a secondary saves it for Others only", WM.db.others.assign2.WARRIOR == "WISDOM" and WM.db.party.assign2 == nil)
 	local fresh = load({ others = false })
 	check("a fresh profile has no secondaries, and only Others has the table", next(fresh.db.others.assign2) == nil and fresh.db.party.assign2 == nil and fresh.db.self.assign2 == nil)
+end
+
+----------------------------------------------------------------------
+print("== Lower ranks for low-level targets")
+do
+	local WM, ns, E, W = load()
+	local g = E.g
+	g.SPELL_FAILED_LOWLEVEL = "Target is too low level"
+	-- Blessing of Might: four ranks, each its own spellbook entry (id, "Rank N", level learned)
+	local MIGHT = { { 19740, "Rank 1", 4 }, { 19834, "Rank 2", 12 }, { 19835, "Rank 3", 22 }, { 19836, "Rank 4", 32 } }
+	g.C_SpellBook.GetNumSpellBookSkillLines = function() return 1 end
+	g.C_SpellBook.GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = #MIGHT } end
+	g.C_SpellBook.GetSpellBookItemInfo = function(slot) local r = MIGHT[slot]; return { name = "Blessing of Might", spellID = r[1], subName = r[2] } end
+	g.C_SpellBook.IsSpellKnown = function() return true end
+	g.C_Spell.GetSpellLevelLearned = function(id) for _, r in ipairs(MIGHT) do if r[1] == id then return r[3] end end end
+	local buff = WM.caster.buffs.MIGHT
+	local function id(rank) return rank and rank.id end
+	check("ranks are read from the spellbook, highest first", #ns.Ranks("Blessing of Might") == 4 and ns.Ranks("Blessing of Might")[1].id == 19836)
+	check("a high-level target gets the plain name (the highest rank)", ns.RankFor(buff, 60, "k") == nil)
+	check("a target 10 levels under the highest rank still gets it", ns.RankFor(buff, 22, "k") == nil)
+	check("a target too low for the highest rank gets the highest that fits", id(ns.RankFor(buff, 14, "k")) == 19835 and id(ns.RankFor(buff, 5, "k")) == 19834)
+	check("a level-1 target gets the lowest rank when nothing fits", id(ns.RankFor(buff, 1, "k")) == 19740 or id(ns.RankFor(buff, 1, "k")) == 19834)
+	check("an unknown target level casts the plain name", ns.RankFor(buff, nil, "k") == nil and ns.RankFor(buff, E.g.SECRET_LEVEL, "k") == nil)
+	check("a spell with one rank never picks a rank", ns.RankFor({ name = "Nothing" }, 5, "k") == nil)
+
+	-- the press: group member level 14 gets rank 3 by id; a stranger gets "Name(Rank 3)" in the macro
+	W.groupSize = 1
+	addUnit(W, "party1", { class = "WARRIOR", name = "Wally", guid = "G-wally", dist = 8, level = 14, auras = {} })
+	W.units.player.auras = { ["Blessing of Wisdom"] = true }
+	WM.db.self.enabled = false
+	WM.db.party.assign.WARRIOR = "MIGHT"
+	W.spells["Blessing of Might"] = 19836; W.known[19836] = true
+	local b = press(E)
+	check("group member level 14: the spell attribute is rank 3's id", b.attrs.type == "spell" and b.attrs.spell == 19835 and b.attrs.unit == "party1")
+	check("...and the log says why", table.concat(ns.LogLines(), "\n"):find("casting Rank 3", 1, true) ~= nil)
+	W.units.party1.level = 60; W.now = W.now + 10; ns.Select.Reset()
+	b = press(E)
+	check("group member level 60: plain name as before", b.attrs.spell == "Blessing of Might")
+
+	-- a refused cast steps one rank down on the next press, and only for that person
+	W.units.party1.level = 40; W.now = W.now + 10; ns.Select.Reset()
+	b = press(E)
+	check("level 40 gets the highest rank by name", b.attrs.spell == "Blessing of Might")
+	local castFrame = ns.castFrame
+	castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, g.SPELL_FAILED_LOWLEVEL)
+	check("'too low level' is its own failure kind", ns.FailureKind(g.SPELL_FAILED_LOWLEVEL) == "lowlevel")
+	check("the log says a lower rank will be tried", table.concat(ns.LogLines(), "\n"):find("a lower rank of Blessing of Might will be tried", 1, true) ~= nil)
+	W.now = W.now + 1
+	b = press(E)
+	check("the next press casts rank 3 by id", b.attrs.spell == 19835)
+	castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, g.SPELL_FAILED_LOWLEVEL)
+	W.now = W.now + 1
+	b = press(E)
+	check("refused again: rank 2", b.attrs.spell == 19834)
+	ns.RankReset()
+
+	-- a stranger is cast on through a macro by name, so the rank goes in as "Name(Rank N)"
+	W.groupSize = 0; W.units.party1 = nil
+	WM.db.others.enabled = true; WM.db.others.assign.PRIEST = "MIGHT"
+	addUnit(W, "nameplate1", { class = "PRIEST", name = "Lowbie", guid = "G-low", interact = "mid", level = 10, auras = {} })
+	W.plates = { "nameplate1" }
+	W.now = W.now + 10; ns.Select.Reset()
+	b = press(E)
+	check("stranger level 10: the macro casts Blessing of Might(Rank 2)", (b.attrs.macrotext or ""):find("Blessing of Might(Rank 2)", 1, true) ~= nil)
 end
 
 ----------------------------------------------------------------------

@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Fixed
+- A target too low level for your highest rank (a level 10 player when you know Arcane Intellect Rank 3) now gets a lower rank, as the spellbook does. WellMet reads your learned ranks and the level each is learned at, casts the highest one that fits, and if the game still says the target is too low level, steps one rank further down on the next press.
 ### Added
 - `/wellmet ranks`: a copyable list of every rank of your buffs in the spellbook, the level each is learned at, and your target's level. For building a rank-by-target-level table from Forever's own data.
 
