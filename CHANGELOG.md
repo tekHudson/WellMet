@@ -5,6 +5,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- `/wellmet ranktest`: a test for crowded places. Each key press casts your highest rank of a buff by id on a nearby player at a level not tested yet, and steps down a rank while the game refuses it as too low level. `/wellmet ranktest report` shows, per target level, which ranks were refused or accepted, and what that says about the level rule; `reset` clears it. It buffs real players. The refusal wording is recorded as the game gives it.
+
 ### Fixed
 - A target too low level for your highest rank (a level 10 player when you know Arcane Intellect Rank 3) now gets a lower rank, as the spellbook does. WellMet reads your learned ranks and the level each is learned at, casts the highest one that fits, and if the game still says the target is too low level, steps one rank further down on the next press.
 ### Added

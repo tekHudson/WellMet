@@ -1349,6 +1349,7 @@ do
 	g.C_SpellBook.IsSpellKnown = function() return true end
 	g.C_Spell.GetSpellLevelLearned = function(id) for _, r in ipairs(MIGHT) do if r[1] == id then return r[3] end end end
 	local buff = WM.caster.buffs.MIGHT
+	local castFrame = ns.castFrame
 	local function id(rank) return rank and rank.id end
 	check("ranks are read from the spellbook, highest first", #ns.Ranks("Blessing of Might") == 4 and ns.Ranks("Blessing of Might")[1].id == 19836)
 	check("a high-level target gets the plain name (the highest rank)", ns.RankFor(buff, 60, "k") == nil)
@@ -1376,7 +1377,6 @@ do
 	W.units.party1.level = 40; W.now = W.now + 10; ns.Select.Reset()
 	b = press(E)
 	check("level 40 gets the highest rank by name", b.attrs.spell == "Blessing of Might")
-	local castFrame = ns.castFrame
 	castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, g.SPELL_FAILED_LOWLEVEL)
 	check("'too low level' is its own failure kind", ns.FailureKind(g.SPELL_FAILED_LOWLEVEL) == "lowlevel")
 	check("the log says a lower rank will be tried", table.concat(ns.LogLines(), "\n"):find("a lower rank of Blessing of Might will be tried", 1, true) ~= nil)
@@ -1397,6 +1397,36 @@ do
 	W.now = W.now + 10; ns.Select.Reset()
 	b = press(E)
 	check("stranger level 10: the macro casts Blessing of Might(Rank 2)", (b.attrs.macrotext or ""):find("Blessing of Might(Rank 2)", 1, true) ~= nil)
+
+	-- /wellmet ranktest: highest rank by id on a new level, stepping down while refused, then the next level
+	W.units.nameplate1 = nil; W.plates = {}
+	W.groupSize = 2
+	addUnit(W, "party1", { class = "WARRIOR", name = "Wally", guid = "G-wally", dist = 8, level = 14, auras = {} })
+	addUnit(W, "party2", { class = "MAGE", name = "Mia", guid = "G-mia", dist = 20, level = 40, auras = {} })
+	WM.db.rankTest = {}
+	local RT = ns.RankTest
+	check("the rank test is off by default and toggles on", RT.active == false and RT.Toggle() == true)
+	local function tick() W.now = W.now + 2 end
+	local function refuse() castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, "Target is too low level") end
+	tick(); b = press(E)
+	check("test press 1: the nearest new level (14) gets the highest rank by id", b.attrs.spell == 19836 and b.attrs.unit == "party1")
+	refuse(); tick(); b = press(E)
+	check("refused: the same person gets the next rank down", b.attrs.spell == 19835 and b.attrs.unit == "party1")
+	refuse(); tick(); b = press(E)
+	check("refused again: rank 2", b.attrs.spell == 19834 and b.attrs.unit == "party1")
+	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SENT", "player", "Wally", "Cast-9", 19836)
+	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-9")
+	check("accepted: the level is recorded", WM.db.rankTest[14] and WM.db.rankTest[14].done and WM.db.rankTest[14].accepted == "Rank 2" and #WM.db.rankTest[14].refused == 2)
+	tick(); b = press(E)
+	check("the next press moves to a level not tested yet (40)", b.attrs.unit == "party2" and b.attrs.spell == 19836)
+	castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, "Out of range.")
+	check("another failure is noted, not treated as a refusal", WM.db.rankTest[40].errors == 1 and #WM.db.rankTest[40].refused == 0)
+	local report = RT.Report()
+	check("the report lists the level, the refused ranks with their gaps, the accepted rank and the rule",
+		report:find("target level 14", 1, true) and report:find("32(gap 18)", 1, true) and report:find("accepted: Rank 2", 1, true) and report:find("consistent", 1, true))
+	RT.Toggle(); RT.Reset()
+	check("off again, results cleared", RT.active == false and next(WM.db.rankTest) == nil)
+	check("the command opens the report without throwing", pcall(function() WM:RankTestCommand("report"); WM:RankTestCommand(""); WM:RankTestCommand("") end))
 end
 
 ----------------------------------------------------------------------

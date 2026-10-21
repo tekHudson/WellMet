@@ -101,8 +101,19 @@ function WM:OnPress(b, fromMacro)
 	local cands, rejected, info = ns.Discovery.Discover()
 	local ctx = { now = now, settings = WM.db, caster = WM.caster, probe = ns.Probe, requests = ns.Requests.Active(), back = ns.BuffBack.Active(now) }
 	local best, skipped = ns.Select.Pick(cands, ctx)
+	-- /wellmet ranktest: the person and rank come from the test, not from the buff rules
+	local test, testWhy
+	if ns.RankTest.active then
+		test, testWhy = ns.RankTest.Next(cands)
+		best = test and { cand = test.cand, buff = test.buff, dist = math.huge, note = "rank test, level " .. test.level } or nil
+	end
 	WM.lastPick = { best = best, skipped = skipped, rejected = rejected, info = info, at = now, cands = cands }
 
+	if not best and ns.RankTest.active then
+		WM:Note("Rank test: " .. ns.SafeStr(testWhy) .. ". (/wellmet ranktest report shows what was tested; /wellmet ranktest turns it off.)")
+		WM:Log("press: rank test has nobody to try:", testWhy)
+		return
+	end
 	if not best then
 		local list = names(WM.caster)
 		local msg = (list ~= "") and ("Nobody nearby needs " .. list .. ".") or "Nothing needs buffing right now."
@@ -133,10 +144,10 @@ function WM:OnPress(b, fromMacro)
 	end
 	-- A target too low level for your highest rank gets a lower one (the name alone always casts the highest).
 	local level = UnitLevel(cand.unit)
-	local rank = ns.RankFor(buff, level, cand.key)
+	local rank = test and test.rank or ns.RankFor(buff, level, cand.key)
 	local ranks = ns.Ranks(buff.name)
 	local rankLevel = rank and rank.level or (ranks[1] and ranks[1].level)
-	if rank then
+	if rank and not test then
 		WM:Log("rank: target level " .. ns.SafeStr(level) .. " is too low for " .. buff.name .. " " .. ns.SafeStr(ranks[1] and ranks[1].sub) .. ", casting " .. ns.SafeStr(rank.sub) .. " (id " .. rank.id .. ")")
 	end
 	if cand.fullName then
@@ -152,7 +163,7 @@ function WM:OnPress(b, fromMacro)
 		b:SetAttribute("spell", rank and rank.id or buff.name)      -- by id for a lower rank; CastSpellByID takes the id
 		b:SetAttribute("unit", cand.unit)
 	end
-	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now, rankLevel = rankLevel }
+	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now, rankLevel = rankLevel, test = test and true or nil, testLevel = test and test.level or nil }
 	WM:Log("press: armed", buff.name, "on", cand.name, "(" .. cand.unit .. ",", "tier " .. cand.tier .. ",",
 		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")" .. (best.note and (" - " .. best.note) or ""))
 end
@@ -206,6 +217,7 @@ local function failureKind(message)
 	if message == nil then return nil end
 	if message == _G.SPELL_FAILED_AURA_BOUNCED then return "stronger" end
 	if _G.SPELL_FAILED_LOWLEVEL and message == _G.SPELL_FAILED_LOWLEVEL then return "lowlevel" end
+	if type(message) == "string" and not issecretvalue(message) and message:lower():find("low level", 1, true) then return "lowlevel" end
 	if message == _G.SPELL_FAILED_LINE_OF_SIGHT or message == _G.SPELL_FAILED_VISION_OBSCURED then return "los" end
 	if message == _G.SPELL_FAILED_OUT_OF_RANGE or message == _G.ERR_OUT_OF_RANGE then return "range" end
 	return nil
@@ -233,6 +245,7 @@ end
 local function onSucceeded(_, castGUID)
 	local p = WM.pending
 	if not p or not p.sent or p.castGUID ~= castGUID then return end
+	if p.test then ns.RankTest.Accepted(p) end
 	WM:Note("Buffed " .. ns.SafeStr(p.name) .. " with " .. p.spell .. ".")
 	WM:Log("cast ok:", p.spell, "->", p.name)
 	ns.Select.Succeeded(p.key, p.spell)
@@ -242,6 +255,12 @@ end
 local function onError(_, message)
 	local p = pendingRecent()
 	local kind = failureKind(message)
+	if p and p.test and message ~= nil then
+		-- the rank test records every failure, known or not: an unknown message is how the game's real wording is learned
+		ns.RankTest.Failed(p, message, kind)
+		WM.pending = nil
+		return
+	end
 	if not p or not kind then return end
 	local seconds = FAILED_SECONDS
 	if kind == "lowlevel" then
