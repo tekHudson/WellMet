@@ -32,7 +32,7 @@ def page(body, h=760): return f"<!doctype html><meta charset=utf-8><style>{CSS}b
 
 P = {}
 P["1-get-started"] = page("""
-<h1>WellMet: one key, one buff</h1><div class=sub>Buffs the next nearby player who needs it.</div>
+<h1>WellMet: one key, many buffs</h1><div class=sub>Buffs the next nearby player who needs it.</div>
 <div class=row>
  <div class=card><div class=n>1</div><div class=big>⌨️</div><div class=t>Bind a key</div><div class=d>Game menu → Key Bindings → <b>WellMet</b></div></div>
  <div class=arrow>➜</div>

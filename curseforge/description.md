@@ -1,4 +1,4 @@
-# WellMet: one key, the next buff
+# WellMet: one key, many buffs
 
 Bind one key. Each press buffs **you**, then the **next person nearby who needs it**. Press again and it moves on. No target-clicking, no raid frames, no tracking window. It only answers "who needs what right now?" when you press.
 
