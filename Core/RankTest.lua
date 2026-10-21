@@ -3,7 +3,7 @@
 Stand somewhere crowded (a city) and turn it on. Every key press then picks a nearby player whose level has not been
 tested yet and casts your highest rank of a buff on them BY ID. If the game says the target is too low level, the next
 press tries the same player with the next rank down, until one is accepted. Each level is written down once:
-which ranks were refused and which was accepted. `/wellmet ranktest report` shows the table and what it says about the
+which ranks were refused and which was accepted (kept per class). `/wellmet ranktest report` shows the table and what it says about the
 level rule (the gap between a rank's learned level and the target's level); the results survive a /reload.
 
 It buffs real players, so use it where that is welcome. Nothing happens in combat or without a key press.
@@ -20,9 +20,11 @@ local MAX_ERRORS = 2        -- other failures (range, line of sight ...) for one
 
 RankTest.active = false
 
+-- Results are kept per class (Mage and Paladin buffs have different ranks), in WM.db.rankTest[classToken][target level].
 local function results()
 	WM.db.rankTest = WM.db.rankTest or {}
-	return WM.db.rankTest
+	WM.db.rankTest[WM.classToken] = WM.db.rankTest[WM.classToken] or {}
+	return WM.db.rankTest[WM.classToken]
 end
 
 local function readableLevel(unit)
@@ -117,8 +119,9 @@ function RankTest.Failed(p, message, kind)
 	end
 end
 
-function RankTest.Reset()
-	WM.db.rankTest = {}
+function RankTest.Reset()      -- this class only
+	WM.db.rankTest = WM.db.rankTest or {}
+	WM.db.rankTest[WM.classToken] = {}
 end
 
 function RankTest.Toggle()
@@ -128,7 +131,7 @@ end
 
 -- The table, and what it says about the rule.
 function RankTest.Report()
-	local out = { "WellMet rank test  " .. date("%Y-%m-%d %H:%M:%S"), "client " .. ns.SafeStr((GetBuildInfo())) .. "  player level " .. ns.SafeStr(UnitLevel("player")), "" }
+	local out = { "WellMet rank test  " .. date("%Y-%m-%d %H:%M:%S"), "client " .. ns.SafeStr((GetBuildInfo())) .. "  " .. ns.SafeStr(WM.classToken) .. "  player level " .. ns.SafeStr(UnitLevel("player")), "" }
 	local res, levels = results(), {}
 	for level in pairs(res) do levels[#levels + 1] = level end
 	table.sort(levels)

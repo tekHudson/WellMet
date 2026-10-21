@@ -1405,6 +1405,7 @@ do
 	addUnit(W, "party2", { class = "MAGE", name = "Mia", guid = "G-mia", dist = 20, level = 40, auras = {} })
 	WM.db.rankTest = {}
 	local RT = ns.RankTest
+	local function RTR() return WM.db.rankTest[WM.classToken] or {} end
 	check("the rank test is off by default and toggles on", RT.active == false and RT.Toggle() == true)
 	local function tick() W.now = W.now + 2 end
 	local function refuse() castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, "Target is too low level") end
@@ -1416,16 +1417,16 @@ do
 	check("refused again: rank 2", b.attrs.spell == 19834 and b.attrs.unit == "party1")
 	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SENT", "player", "Wally", "Cast-9", 19836)
 	castFrame.scripts.OnEvent(castFrame, "UNIT_SPELLCAST_SUCCEEDED", "player", "Cast-9")
-	check("accepted: the level is recorded", WM.db.rankTest[14] and WM.db.rankTest[14].done and WM.db.rankTest[14].accepted == "Rank 2" and #WM.db.rankTest[14].refused == 2)
+	check("accepted: the level is recorded", RTR()[14] and RTR()[14].done and RTR()[14].accepted == "Rank 2" and #RTR()[14].refused == 2)
 	tick(); b = press(E)
 	check("the next press moves to a level not tested yet (40)", b.attrs.unit == "party2" and b.attrs.spell == 19836)
 	castFrame.scripts.OnEvent(castFrame, "UI_ERROR_MESSAGE", 1, "Out of range.")
-	check("another failure is noted, not treated as a refusal", WM.db.rankTest[40].errors == 1 and #WM.db.rankTest[40].refused == 0)
+	check("another failure is noted, not treated as a refusal", RTR()[40].errors == 1 and #RTR()[40].refused == 0)
 	local report = RT.Report()
 	check("the report lists the level, the refused ranks with their gaps, the accepted rank and the rule",
 		report:find("target level 14", 1, true) and report:find("32(gap 18)", 1, true) and report:find("accepted: Rank 2", 1, true) and report:find("consistent", 1, true))
 	RT.Toggle(); RT.Reset()
-	check("off again, results cleared", RT.active == false and next(WM.db.rankTest) == nil)
+	check("off again, results cleared", RT.active == false and next(RTR()) == nil)
 	check("the command opens the report without throwing", pcall(function() WM:RankTestCommand("report"); WM:RankTestCommand(""); WM:RankTestCommand("") end))
 end
 
