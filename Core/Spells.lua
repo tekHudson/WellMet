@@ -47,7 +47,7 @@ end
 ----------------------------------------------------------------------
 -- A rank can be cast on a target whose level is at least (the level the rank is learned at) minus this. Measured on Forever
 -- 1.60.1 with /wellmet ranktest (2026-10-21, Mage, 30 target levels): a gap of 10 was accepted (level 18, Arcane Intellect
--- learned at 28), 11 was refused (level 17). A refused cast (SPELL_FAILED_LOWLEVEL) still steps down one more rank, see Core/Cast.lua.
+-- learned at 28), 11 was refused (level 17); the same on a Paladin (Blessing of Might learned at 12: level 2 accepted, level 1 refused). A refused cast (SPELL_FAILED_LOWLEVEL) still steps down one more rank, see Core/Cast.lua.
 ns.RANK_LEVEL_GAP = 10
 
 local rankCache = {}      -- buff name -> list of { id, sub, level }, highest level first
