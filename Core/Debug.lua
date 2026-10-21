@@ -215,6 +215,58 @@ end
 ----------------------------------------------------------------------
 local W, H = 760, 500
 
+-- /wellmet ranks: every rank of each buff the client lists in your spellbook, with the level it is learned at, plus the level
+-- of your target. Read-only; paste it back so a rank-by-target-level table is built from Forever's own data, not from Classic's.
+function WM:BuildRanksReport()
+	local out = { "WellMet ranks  " .. date("%Y-%m-%d %H:%M:%S") }
+	local function try(fn, ...)
+		local ok, v = pcall(fn, ...)
+		if ok and not issecretvalue(v) then return v end
+		return nil
+	end
+	section(out, "Overview", function(add)
+		local version, build, _, toc = GetBuildInfo()
+		add(string.format("addon %s | client %s (%s) interface %s", S(WM.version), S(version), S(build), S(toc)))
+		add(string.format("player=%s class=%s level=%s", S(WM.player), S(WM.classToken), S(UnitLevel("player"))))
+		if UnitExists("target") then
+			add(string.format("target=%s level=%s", S(try(UnitName, "target")), S(try(UnitLevel, "target"))))
+		else
+			add("target: none (target someone to include their level)")
+		end
+	end)
+	section(out, "Spellbook entries for your buffs (slot, spell id, rank text, level learned)", function(add)
+		local wanted = {}
+		for _, key in ipairs(WM.caster.all) do
+			local buff = WM.caster.buffs[key]
+			wanted[buff.name] = buff.name
+			for _, alt in ipairs(buff.alt or {}) do wanted[alt] = buff.name end
+		end
+		local lines = {}
+		for line = 1, C_SpellBook.GetNumSpellBookSkillLines() do
+			local info = C_SpellBook.GetSpellBookSkillLineInfo(line)
+			for slot = info.itemIndexOffset + 1, info.itemIndexOffset + info.numSpellBookItems do
+				local item = C_SpellBook.GetSpellBookItemInfo(slot, Enum.SpellBookSpellBank.Player)
+				if item and wanted[item.name] then
+					local id = item.spellID or item.actionID
+					lines[#lines + 1] = string.format("  %-28s slot %-4s id %-8s rank '%s'  learned at level %s  known=%s",
+						S(item.name), S(slot), S(id), S(item.subName), S(try(C_Spell.GetSpellLevelLearned, id)), yn(try(C_SpellBook.IsSpellKnown, id)))
+				end
+			end
+		end
+		if #lines == 0 then add("  none of your buffs were found in the spellbook") end
+		for _, l in ipairs(lines) do add(l) end
+	end)
+	section(out, "What a cast by name resolves to", function(add)
+		for _, key in ipairs(WM.caster.all) do
+			local buff = WM.caster.buffs[key]
+			local id = ns.SpellId(buff)
+			add(string.format("  %-28s id %-8s rank '%s'  learned at level %s", buff.name, S(id), S(id and try(C_Spell.GetSpellSubtext, id)),
+				S(id and try(C_Spell.GetSpellLevelLearned, id))))
+		end
+	end)
+	return table.concat(out, "\n")
+end
+
 local function buildWindow()
 	local f = CreateFrame("Frame", "WellMetLogFrame", UIParent, "BackdropTemplate")
 	f:SetSize(W, H)
@@ -278,10 +330,10 @@ local function buildWindow()
 	return f
 end
 
-function WM:ShowLog(scrollToEnd)
+function WM:ShowLog(scrollToEnd, text)
 	if not WM.logFrame then WM.logFrame = buildWindow() end
 	local f = WM.logFrame
-	local text = WM:BuildReport()
+	text = text or WM:BuildReport()
 	f.edit.orig = text
 	f.edit:SetText(text)
 	f.edit:SetCursorPosition(0)
@@ -292,4 +344,9 @@ function WM:ShowLog(scrollToEnd)
 		-- the scroll range is only updated after the new text is laid out
 		C_Timer.After(0, function() f.scroll:SetVerticalScroll(f.scroll:GetVerticalScrollRange()) end)
 	end
+end
+
+-- /wellmet ranks: the same copyable window, filled with the rank report
+function WM:ShowRanks()
+	WM:ShowLog(false, WM:BuildRanksReport())
 end

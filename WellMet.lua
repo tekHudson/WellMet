@@ -160,6 +160,8 @@ function WM:SetupSlash()
 			else
 				WM:ShowLog()
 			end
+		elseif command == "ranks" then
+			WM:ShowRanks()
 		elseif command == "debug" then
 			local on = WM:ToggleDebug()
 			WM:Print("debug: " .. (on and "ON (recording the log, showing press messages)" or "OFF") .. "  (/wellmet log opens the copyable log)")
@@ -181,7 +183,7 @@ function WM:SetupSlash()
 		elseif command == "macro" then
 			WM:CreateMacro()
 		else
-			WM:Print("/wellmet — settings | self | party | others | priority | tools | log (or why) | log clear | macro | strip | announce | requests (clear) | forget | debug  (set the key under Key Bindings > WellMet)")
+			WM:Print("/wellmet — settings | self | party | others | priority | tools | log (or why) | log clear | ranks | macro | strip | announce | requests (clear) | forget | debug  (set the key under Key Bindings > WellMet)")
 			WM:Print("Macro: /click WellMetCast")
 		end
 	end

@@ -50,7 +50,7 @@ all: no messages, no settings, no minimap button. A single self buff is better s
   targeting macro WellMet uses for them from inside another macro.
 - WellMet is quiet by default. If a press does nothing and you want to know why, turn on `/wellmet debug`: it
   shows messages like "Nobody nearby needs ..." and records the log that `/wellmet log` shows.
-- `/wellmet` (or `/well`, `/wmet`) settings · `/wellmet strip` · `/wellmet announce` · `/wellmet requests` · `/wellmet log` copyable report · `/wellmet forget` · `/wellmet debug`
+- `/wellmet` (or `/well`, `/wmet`) settings · `/wellmet strip` · `/wellmet announce` · `/wellmet requests` · `/wellmet log` copyable report · `/wellmet ranks` your buff ranks and the level each is learned at · `/wellmet forget` · `/wellmet debug`
 
 ## How it picks
 

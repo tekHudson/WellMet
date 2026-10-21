@@ -165,7 +165,18 @@ local function newEnv(W)
 	}
 	g.SpellIsTargeting = function() return false end
 	g.UnitCastingInfo = function() return nil end
-	g.C_SpellBook = { IsSpellKnown = function(id) return W.known[id] or false end }
+	g.UnitLevel = function(u) local x = U(u); return x and (x.level or 60) or nil end
+	g.Enum = g.Enum or {}
+	g.Enum.SpellBookSpellBank = { Player = 0 }
+	g.C_SpellBook = {
+		IsSpellKnown = function(id) return W.known[id] or false end,
+		GetNumSpellBookSkillLines = function() return 1 end,
+		GetSpellBookSkillLineInfo = function() return { itemIndexOffset = 0, numSpellBookItems = 2 } end,
+		GetSpellBookItemInfo = function(slot)
+			if slot == 1 then return { name = "Blessing of Might", spellID = 19834, subName = "Rank 3" } end
+			return { name = "Hearthstone", spellID = 1, subName = "" }
+		end,
+	}
 	g.C_Secrets = {
 		ShouldAurasBeSecret = function() return W.restricted end,
 		HasSecretRestrictions = function() return true end,
@@ -1624,6 +1635,12 @@ do
 		r:find("ELIGIBLE #1", 1, true) and r:find("<== next press", 1, true) and r:find("already has Blessing of Wisdom", 1, true))
 	check("report notes the nameplate CVar and bound key", r:find("nameplateShowFriendlyPlayers", 1, true) and r:find("Key Bindings > WellMet", 1, true))
 	check("ShowLog builds the window", pcall(function() WM:ShowLog() end))
+	do
+		local report
+		check("the ranks report builds without throwing (stubbed spellbook included)", pcall(function() report = WM:BuildRanksReport() end))
+		check("the ranks report names the player level and the sections", report and report:find("level=", 1, true) and report:find("Spellbook entries", 1, true) and report:find("What a cast by name resolves to", 1, true) and report:find("Blessing of Might", 1, true) and report:find("Rank 3", 1, true) and not report:find("!!", 1, true))
+		check("ShowRanks opens the window", pcall(function() WM:ShowRanks() end))
+	end
 	do   -- the window's Clear log button empties the log, rebuilds the report and says so
 		WM:Log("a line that should disappear")
 		check("log has the line before clearing", (WM:BuildReport()):find("a line that should disappear", 1, true) ~= nil)

@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- `/wellmet ranks`: a copyable list of every rank of your buffs in the spellbook, the level each is learned at, and your target's level. For building a rank-by-target-level table from Forever's own data.
 
 ## [1.4.1] - 2026-10-21
 ### Changed
