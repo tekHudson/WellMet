@@ -5,17 +5,17 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.5.0] - 2026-10-21
 ### Added
 - `/wellmet ranktest`: a test for crowded places. Each key press casts your highest rank of a buff by id on a nearby player at a level not tested yet, and steps down a rank while the game refuses it as too low level. `/wellmet ranktest report` shows, per target level, which ranks were refused or accepted, and what that says about the level rule; `reset` clears it. Results are kept per class. It buffs real players. The refusal wording is recorded as the game gives it.
+- `/wellmet ranks`: a copyable list of every rank of your buffs in the spellbook, the level each is learned at, and your target's level. For building a rank-by-target-level table from Forever's own data.
+
+### Changed
+- Don't buff PvP-flagged players now only applies while you are not PvP flagged yourself. Once you are flagged, they are buffed as usual.
 
 ### Fixed
 - A target too low level for your highest rank (a level 10 player when you know Arcane Intellect Rank 3) now gets a lower rank, as the spellbook does. WellMet reads your learned ranks and the level each is learned at, casts the highest one that fits, and if the game still says the target is too low level, steps one rank further down on the next press.
-### Added
-- `/wellmet ranks`: a copyable list of every rank of your buffs in the spellbook, the level each is learned at, and your target's level. For building a rank-by-target-level table from Forever's own data.
-
-## [1.4.1] - 2026-10-21
-### Changed
-- Don't buff PvP-flagged players now only applies while you are not PvP flagged yourself. Once you are flagged, they are buffed as usual.
 
 ## [1.4.0] - 2026-10-21
 ### Added
