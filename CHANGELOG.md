@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.4.0] - 2026-10-21
 ### Added
 - Don't buff PvP-flagged players (General settings, on by default): anyone in your group or nearby who is PvP flagged is skipped, since buffing them would flag you too. You are never skipped. The reminder icons ignore them as well.
 
