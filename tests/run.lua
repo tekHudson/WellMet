@@ -1425,6 +1425,9 @@ do
 	local report = RT.Report()
 	check("the report lists the level, the refused ranks with their gaps, the accepted rank and the rule",
 		report:find("target level 14", 1, true) and report:find("32(gap 18)", 1, true) and report:find("accepted: Rank 2", 1, true) and report:find("consistent", 1, true))
+	W.units.party1 = nil; W.units.party2 = nil; W.groupSize = 0
+	tick(); press(E)
+	check("with nobody around the rank test says why", printed(W, "Of 0 other players found"))
 	RT.Toggle(); RT.Reset()
 	check("off again, results cleared", RT.active == false and next(RTR()) == nil)
 	check("the command opens the report without throwing", pcall(function() WM:RankTestCommand("report"); WM:RankTestCommand(""); WM:RankTestCommand("") end))

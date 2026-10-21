@@ -70,17 +70,36 @@ function RankTest.Next(cands)
 	end
 	-- otherwise the nearest player at a level not tested yet
 	local best, bestDist
+	local why = { others = 0, noName = 0, noLevel = 0, tested = 0, noBuff = 0, range = 0 }
 	for _, cand in ipairs(cands) do
-		if cand.tier ~= 0 and not (cand.tier == 2 and not cand.fullName) then
-			local level = readableLevel(cand.unit)
-			local buff = level and not res[level] and testBuff(cand)
-			if buff and ns.Probe.inRange(buff, cand.unit) == true then
-				local dist = ns.Probe.distance(cand) or math.huge
-				if not best or dist < bestDist then best, bestDist = { cand = cand, buff = buff, level = level }, dist end
+		if cand.tier ~= 0 then
+			why.others = why.others + 1
+			if cand.tier == 2 and not cand.fullName then
+				why.noName = why.noName + 1
+			else
+				local level = readableLevel(cand.unit)
+				if not level then
+					why.noLevel = why.noLevel + 1
+				elseif res[level] then
+					why.tested = why.tested + 1
+				else
+					local buff = testBuff(cand)
+					if not buff then
+						why.noBuff = why.noBuff + 1
+					elseif ns.Probe.inRange(buff, cand.unit) ~= true then
+						why.range = why.range + 1
+					else
+						local dist = ns.Probe.distance(cand) or math.huge
+						if not best or dist < bestDist then best, bestDist = { cand = cand, buff = buff, level = level }, dist end
+					end
+				end
 			end
 		end
 	end
-	if not best then return nil, "nobody at a new level is in range" end
+	if not best then
+		return nil, string.format("no player at a new level to cast on. Of %d other players found: %d at a level already tested, %d out of range, %d with an unreadable level, %d with no readable name, %d where no buff of yours has two or more ranks",
+			why.others, why.tested, why.range, why.noLevel, why.noName, why.noBuff)
+	end
 	best.rank = nextRank(best.buff, { refused = {} })
 	res[best.level] = { name = best.cand.name, key = best.cand.key, buff = best.buff.key, refused = {}, errors = 0, done = false }
 	return best
