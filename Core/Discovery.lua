@@ -92,7 +92,8 @@ local function describe(unit, tier, plate)
 		name = name or unit,
 		fullName = fullName,
 		class = safe(class),
-		targeted = tier ~= 0 and UnitIsUnit(unit, "target") and true or false,     -- your current target (you picked them by hand)
+		-- your current target, if you picked them by hand (not someone WellMet's own macro just targeted)
+		targeted = tier ~= 0 and UnitIsUnit(unit, "target") and not (ns.addonTarget and guid and ns.addonTarget.guid == guid) and true or false,
 	}
 end
 

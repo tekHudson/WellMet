@@ -497,6 +497,18 @@ do
 	why = whyRejected({})
 	check("a plate with no text at all: the reason says so", why:find("no readable text", 1, true) ~= nil)
 
+	-- a stranger WellMet's own macro targeted is not "a target you picked"
+	do
+		W.plates = {}
+		addUnit(W, "target", { class = "MAGE", name = "Tgt", guid = "G-tgt", dist = 5 })
+		ns.addonTarget = nil
+		local function tgt() for _, c in ipairs(D.Discover()) do if c.name == "Tgt" then return c end end end
+		check("a target you picked by hand is flagged", tgt() ~= nil and tgt().targeted == true)
+		ns.addonTarget = { guid = "G-tgt", at = 0 }
+		check("the target WellMet's own macro picked is not flagged", tgt() ~= nil and tgt().targeted == false)
+		ns.addonTarget = nil
+	end
+
 	-- strangers off: nameplates ignored
 	WM.db.others.enabled = false
 	W.plates = { "nameplate1" }

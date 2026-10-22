@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Fixed
+- "Buff my target" no longer treats the stranger WellMet itself just targeted as one you picked: before, the key kept recasting on the last person it buffed (and on a line-of-sight retry) instead of moving on.
 - A Paladin who has not learned the primary blessing now casts the secondary one on strangers, instead of skipping them.
 
 ## [1.5.0] - 2026-10-21
@@ -17,6 +18,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 - Don't buff PvP-flagged players now only applies while you are not PvP flagged yourself. Once you are flagged, they are buffed as usual.
 
 ### Fixed
+- "Buff my target" no longer treats the stranger WellMet itself just targeted as one you picked: before, the key kept recasting on the last person it buffed (and on a line-of-sight retry) instead of moving on.
 - A target too low level for your highest rank (a level 10 player when you know Arcane Intellect Rank 3) now gets a lower rank, as the spellbook does. WellMet reads your learned ranks and the level each is learned at, casts the highest one that fits, and if the game still says the target is too low level, steps one rank further down on the next press.
 
 ## [1.4.0] - 2026-10-21
@@ -49,6 +51,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 - A line-of-sight or out-of-range failure now gets one free retry: the first one doesn't skip anyone, so the next press tries them again; a second failure within 30 seconds skips them for 5 seconds as before. A cast that lands resets it. "A more powerful spell is already active" still skips for 5 minutes.
 
 ### Fixed
+- "Buff my target" no longer treats the stranger WellMet itself just targeted as one you picked: before, the key kept recasting on the last person it buffed (and on a line-of-sight retry) instead of moving on.
 - The debug log's "recently tried" line no longer loses the first letter of "Righteous Fury" (the game read the separator as a colour code).
 
 ## [1.1.1] - 2026-10-12
@@ -106,6 +109,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
   instead of every spell you cast, and no longer lists each error message twice.
 
 ### Fixed
+- "Buff my target" no longer treats the stranger WellMet itself just targeted as one you picked: before, the key kept recasting on the last person it buffed (and on a line-of-sight retry) instead of moving on.
 - The key button is disarmed after every click, so a press in combat (when the game won't let an addon change the
   button) can no longer repeat the previous cast on the previous unit.
 - Mashing the key during the global cooldown no longer spams "Spell is not ready yet" or re-targets for nothing: a press

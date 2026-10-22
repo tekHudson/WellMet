@@ -163,6 +163,8 @@ function WM:OnPress(b, fromMacro)
 		b:SetAttribute("spell", rank and rank.id or buff.name)      -- by id for a lower rank; CastSpellByID takes the id
 		b:SetAttribute("unit", cand.unit)
 	end
+	-- the macro above puts this stranger in your target slot; that is not "a target you picked", so remember it
+	ns.addonTarget = cand.fullName and { guid = cand.guid, at = now } or ns.addonTarget
 	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now, rankLevel = rankLevel, test = test and true or nil, testLevel = test and test.level or nil }
 	WM:Log("press: armed", buff.name, "on", cand.name, "(" .. cand.unit .. ",", "tier " .. cand.tier .. ",",
 		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")" .. (best.note and (" - " .. best.note) or ""))
@@ -310,6 +312,11 @@ castFrame:SetScript("OnEvent", function(_, event, ...)
 		if pendingRecent() then WM:Log("evt UI_ERROR_MESSAGE", ns.SafeStr(errorType), ns.SafeStr(message)) end
 		onError(nil, message)
 	elseif event == "PLAYER_TARGET_CHANGED" then
+		local at = ns.addonTarget
+		if at and GetTime() - at.at > 1 then
+			local same = pcall(function() assert(UnitGUID("target") == at.guid) end)     -- anything else: you changed target yourself
+			if not same then ns.addonTarget = nil end
+		end
 		if pendingRecent() then WM:Log("evt PLAYER_TARGET_CHANGED exists=" .. ns.SafeStr(UnitExists("target")), "name=" .. ns.SafeStr(UnitName("target"))) end
 	else
 		-- UNIT_SPELLCAST_FAILED / FAILED_QUIET / INTERRUPTED: why a cast died after it started
