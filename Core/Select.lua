@@ -217,7 +217,12 @@ function Select.Pick(cands, ctx)
 	local function considerList(cand, list, cfg)
 		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
 		local learned = {}
-		for _, buff in ipairs(list) do if known(buff) then learned[#learned + 1] = buff end end
+		for _, buff in ipairs(list) do
+			if known(buff) and not (cand.tank and buff.key == "SALVATION") then learned[#learned + 1] = buff end     -- never Salvation on a tank
+		end
+		if #learned == 0 and cand.tank and #list == 1 and list[1].key == "SALVATION" then
+			return skip(list[1], "a tank: Salvation is never cast on one")
+		end
 		-- your hand-picked target gets the first blessing you know, whatever is on them
 		if isForced(cand) then return add(cand, learned[1] or list[1], cfg) end
 		if #learned == 0 then return add(cand, list[1], cfg) end          -- says "... is not learned"

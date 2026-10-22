@@ -136,18 +136,18 @@ for _, caster in pairs(ns.CasterData) do
 end
 
 -- Default blessings per target class, in order (all editable in settings). The key casts the first one that is learned
--- and not already on them, so Kings is listed first for everyone and Might / Wisdom take over until it is learned.
--- Salvation is not in the defaults (it cuts threat; add it yourself where you want it).
+-- and not already on them, so Kings is listed first for everyone and the next one takes over until it is learned.
+-- Light is healer-only, so it is not a default. Salvation is last (group only); it is never cast on a tank.
 ns.DefaultPrio = {
-	WARRIOR = { "KINGS", "MIGHT" },
-	ROGUE   = { "KINGS", "MIGHT" },
-	HUNTER  = { "KINGS", "WISDOM", "MIGHT" },
-	MAGE    = { "KINGS", "WISDOM" },
-	WARLOCK = { "KINGS", "WISDOM" },
-	PRIEST  = { "KINGS", "WISDOM", "LIGHT" },
-	DRUID   = { "KINGS", "WISDOM", "LIGHT" },
-	SHAMAN  = { "KINGS", "WISDOM", "LIGHT" },
-	PALADIN = { "KINGS", "WISDOM", "LIGHT" },
+	WARRIOR = { "KINGS", "MIGHT", "SALVATION" },
+	ROGUE   = { "KINGS", "MIGHT", "SALVATION" },
+	HUNTER  = { "KINGS", "WISDOM", "MIGHT", "SALVATION" },
+	MAGE    = { "KINGS", "WISDOM", "SALVATION" },
+	WARLOCK = { "KINGS", "WISDOM", "SALVATION" },
+	PRIEST  = { "KINGS", "WISDOM", "SALVATION" },
+	DRUID   = { "KINGS", "WISDOM", "SALVATION" },
+	SHAMAN  = { "KINGS", "WISDOM", "SALVATION" },
+	PALADIN = { "KINGS", "WISDOM", "SALVATION" },
 }
 
 -- Does this character's class have buffs in WellMet? If not, no other file does anything.

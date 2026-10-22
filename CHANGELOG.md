@@ -5,9 +5,12 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Added
+- Salvation is never cast on a tank in your group (the assigned Tank role or the raid main-tank mark), whatever the lists say.
+
 ### Changed
 - Paladin blessings are now an ordered list per target class (up to five slots; four on Others, which has no Salvation), on Self, Party / Raid and Others alike. The key casts the first blessing you have learned that they don't already have from someone else, so when another Paladin puts Kings on them it moves on to your 2nd or 3rd choice. This replaces the strangers-only "Secondary" column; saved primaries and secondaries carry over as the 1st and 2nd slots. "Set all classes" has a row per slot.
-- New defaults for classes you haven't customised: Kings first for everyone, then Might (Warrior, Rogue) and Wisdom (the rest; Hunter gets Wisdom first, then Might) and Light for the healing classes (Priest, Druid, Shaman, Paladin). Salvation is in no default. Until Kings is learned the next one is used.
+- New defaults for classes you haven't customised: Kings first for everyone, then Might (Warrior, Rogue) or Wisdom (the rest; Hunter also gets Might after Wisdom), and Salvation last. Light is not a default (healer-only). Until Kings is learned the next one is used.
 
 ## [1.5.1] - 2026-10-22
 ### Fixed

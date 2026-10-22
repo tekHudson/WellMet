@@ -86,8 +86,16 @@ local function describe(unit, tier, plate)
 		fullName, why = plateFullName(plate, name)
 		if not fullName then return nil, "full name not readable from the nameplate: " .. why end
 	end
+	-- a tank in your group (the assigned role or the raid main-tank mark); Salvation is never cast on one
+	local tank = false
+	if tier ~= 2 then
+		local ok, v = pcall(function()
+			return UnitGroupRolesAssigned(unit) == "TANK" or (GetPartyAssignment and GetPartyAssignment("MAINTANK", unit)) and true or false
+		end)
+		tank = ok and v == true
+	end
 	return {
-		unit = unit, tier = tier, guid = guid,
+		unit = unit, tier = tier, guid = guid, tank = tank,
 		key = guid or ("unit:" .. unit),
 		name = name or unit,
 		fullName = fullName,

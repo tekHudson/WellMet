@@ -1212,12 +1212,12 @@ do
 
 	-- the "nobody needs ..." line names only the blessings that are assigned somewhere
 	W.plates = {}; W.groupSize = 0; W.units.party1 = nil          -- nobody else around
-	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true, ["Blessing of Kings"] = true, ["Blessing of Light"] = true }
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true, ["Blessing of Kings"] = true, ["Blessing of Light"] = true, ["Blessing of Salvation"] = true }
 	W.spells["Devotion Aura"] = 465; W.known[465] = true
 	W.prints = {}
 	press(E)
-	check("by default the message names the blessings of the default lists (not Salvation)",
-		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings / Blessing of Light."))
+	check("by default the message names the blessings of the default lists (Light is not one)",
+		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings / Blessing of Salvation."))
 	local function setLists(section, key)
 		for _, class in ipairs(ns.TargetClasses) do
 			ns.PrioSet(section, class, 1, key)
@@ -1306,6 +1306,17 @@ do
 	check("on yourself too: Kings from another Paladin means your 2nd choice", bs and bs.buff.key == "WISDOM")
 	local bl = run({ KINGS = "other", MIGHT = "other", LIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" }, assign3 = { WARRIOR = "LIGHT" } })
 	check("a 3rd choice is used when the first two are on them from others", bl and bl.buff.key == "LIGHT")
+	-- never Salvation on a tank in your group
+	local tankM = { unit = "party1", key = "G-t", name = "Tank", tier = 1, class = "WARRIOR", order = 1, tank = true }
+	local sTank = mkSettings({}); sTank.party.assign = { WARRIOR = "SALVATION" }; sTank.party.assign2 = { WARRIOR = "KINGS" }
+	local bt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent", KINGS = "absent" }) })
+	check("a tank skips Salvation and gets the next blessing", bt and bt.buff.key == "KINGS")
+	tankM.tank = false
+	bt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent", KINGS = "absent" }) })
+	check("...anyone else gets Salvation first", bt and bt.buff.key == "SALVATION")
+	tankM.tank = true; sTank.party.assign2 = {}
+	local bt2, skt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent" }) })
+	check("a tank whose only blessing is Salvation is skipped, with the reason", bt2 == nil and skt[1].reason:find("tank", 1, true) ~= nil)
 	local bu = run({ KINGS = "absent", MIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" } }, stranger("WARRIOR"))
 	check("(the first choice still wins when nothing is on them)", bu and bu.buff.key == "KINGS")
 
@@ -1750,7 +1761,7 @@ do
 		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Kings first)", warrior[3].selected and not warrior[2].selected)
 	check("every class starts with Kings, then its own: Hunter Wisdom then Might, Mage Wisdom", ns.AssignedKey(WM.db.party, "HUNTER") == "KINGS"
-		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,WISDOM,MIGHT" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM")
+		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,WISDOM,MIGHT,SALVATION" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM,SALVATION")
 	warrior[2].pick()
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
@@ -1922,7 +1933,7 @@ do
 	ns.SetAllAssign(cfg, "assign", "MIGHT")
 	check("Paladin: clicking a blessing sets every class to it", ns.AssignCount(cfg, "assign", "MIGHT") == N)
 	check("...and the per-class choice still reads back that way", ns.AssignedKey(cfg, "WARRIOR") == "MIGHT" and ns.AssignedKey(cfg, "MAGE") == "MIGHT")
-	check("...Warrior's Might moved Kings to the slot Might was in (nothing appears twice)", table.concat(ns.PrioList(cfg, "WARRIOR"), ",") == "MIGHT,KINGS")
+	check("...Warrior's Might moved Kings to the slot Might was in (nothing appears twice)", table.concat(ns.PrioList(cfg, "WARRIOR"), ",") == "MIGHT,KINGS,SALVATION")
 	cfg.assign.MAGE = "WISDOM"
 	check("one class changed by hand: the count shows N-1 for Might, 1 for Wisdom", ns.AssignCount(cfg, "assign", "MIGHT") == N - 1 and ns.AssignCount(cfg, "assign", "WISDOM") == 1)
 	ns.SetAllAssign(cfg, "assign", "MIGHT")
