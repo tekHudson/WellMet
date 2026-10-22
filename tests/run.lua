@@ -1749,8 +1749,8 @@ do
 		warrior[1].data == "MIGHT" and warrior[3].data == "KINGS" and warrior[6].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
 		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Kings first)", warrior[3].selected and not warrior[2].selected)
-	check("every class starts with Kings, then its own: Hunter Might / Wisdom, Mage Wisdom", ns.AssignedKey(WM.db.party, "HUNTER") == "KINGS"
-		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,MIGHT,WISDOM" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM")
+	check("every class starts with Kings, then its own: Hunter Wisdom then Might, Mage Wisdom", ns.AssignedKey(WM.db.party, "HUNTER") == "KINGS"
+		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,WISDOM,MIGHT" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM")
 	warrior[2].pick()
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected

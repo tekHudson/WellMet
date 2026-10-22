@@ -141,7 +141,7 @@ end
 ns.DefaultPrio = {
 	WARRIOR = { "KINGS", "MIGHT" },
 	ROGUE   = { "KINGS", "MIGHT" },
-	HUNTER  = { "KINGS", "MIGHT", "WISDOM" },
+	HUNTER  = { "KINGS", "WISDOM", "MIGHT" },
 	MAGE    = { "KINGS", "WISDOM" },
 	WARLOCK = { "KINGS", "WISDOM" },
 	PRIEST  = { "KINGS", "WISDOM", "LIGHT" },
