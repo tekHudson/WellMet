@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.6.0] - 2026-10-22
 ### Added
 - Salvation is never cast on a tank in your group (the assigned Tank role or the raid main-tank mark), whatever the lists say.
 
