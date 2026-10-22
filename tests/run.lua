@@ -1216,8 +1216,8 @@ do
 	W.spells["Devotion Aura"] = 465; W.known[465] = true
 	W.prints = {}
 	press(E)
-	check("by default the message names the blessings of the default lists (Light is not one)",
-		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings / Blessing of Salvation."))
+	check("by default the message names the blessings of the default lists (neither Light nor Salvation is one)",
+		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings."))
 	local function setLists(section, key)
 		for _, class in ipairs(ns.TargetClasses) do
 			ns.PrioSet(section, class, 1, key)
@@ -1761,7 +1761,7 @@ do
 		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Kings first)", warrior[3].selected and not warrior[2].selected)
 	check("every class starts with Kings, then its own: Hunter Wisdom then Might, Mage Wisdom", ns.AssignedKey(WM.db.party, "HUNTER") == "KINGS"
-		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,WISDOM,MIGHT,SALVATION" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM,SALVATION")
+		and table.concat(ns.PrioList(WM.db.party, "HUNTER"), ",") == "KINGS,WISDOM,MIGHT" and table.concat(ns.PrioList(WM.db.party, "MAGE"), ",") == "KINGS,WISDOM")
 	warrior[2].pick()
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
@@ -1933,7 +1933,7 @@ do
 	ns.SetAllAssign(cfg, "assign", "MIGHT")
 	check("Paladin: clicking a blessing sets every class to it", ns.AssignCount(cfg, "assign", "MIGHT") == N)
 	check("...and the per-class choice still reads back that way", ns.AssignedKey(cfg, "WARRIOR") == "MIGHT" and ns.AssignedKey(cfg, "MAGE") == "MIGHT")
-	check("...Warrior's Might moved Kings to the slot Might was in (nothing appears twice)", table.concat(ns.PrioList(cfg, "WARRIOR"), ",") == "MIGHT,KINGS,SALVATION")
+	check("...Warrior's Might moved Kings to the slot Might was in (nothing appears twice)", table.concat(ns.PrioList(cfg, "WARRIOR"), ",") == "MIGHT,KINGS")
 	cfg.assign.MAGE = "WISDOM"
 	check("one class changed by hand: the count shows N-1 for Might, 1 for Wisdom", ns.AssignCount(cfg, "assign", "MIGHT") == N - 1 and ns.AssignCount(cfg, "assign", "WISDOM") == 1)
 	ns.SetAllAssign(cfg, "assign", "MIGHT")

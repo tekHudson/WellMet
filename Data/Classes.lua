@@ -137,17 +137,17 @@ end
 
 -- Default blessings per target class, in order (all editable in settings). The key casts the first one that is learned
 -- and not already on them, so Kings is listed first for everyone and the next one takes over until it is learned.
--- Light is healer-only, so it is not a default. Salvation is last (group only); it is never cast on a tank.
+-- Light (healer-only) and Salvation (cuts threat, group only) are options, not defaults.
 ns.DefaultPrio = {
-	WARRIOR = { "KINGS", "MIGHT", "SALVATION" },
-	ROGUE   = { "KINGS", "MIGHT", "SALVATION" },
-	HUNTER  = { "KINGS", "WISDOM", "MIGHT", "SALVATION" },
-	MAGE    = { "KINGS", "WISDOM", "SALVATION" },
-	WARLOCK = { "KINGS", "WISDOM", "SALVATION" },
-	PRIEST  = { "KINGS", "WISDOM", "SALVATION" },
-	DRUID   = { "KINGS", "WISDOM", "SALVATION" },
-	SHAMAN  = { "KINGS", "WISDOM", "SALVATION" },
-	PALADIN = { "KINGS", "WISDOM", "SALVATION" },
+	WARRIOR = { "KINGS", "MIGHT" },
+	ROGUE   = { "KINGS", "MIGHT" },
+	HUNTER  = { "KINGS", "WISDOM", "MIGHT" },
+	MAGE    = { "KINGS", "WISDOM" },
+	WARLOCK = { "KINGS", "WISDOM" },
+	PRIEST  = { "KINGS", "WISDOM" },
+	DRUID   = { "KINGS", "WISDOM" },
+	SHAMAN  = { "KINGS", "WISDOM" },
+	PALADIN = { "KINGS", "WISDOM" },
 }
 
 -- Does this character's class have buffs in WellMet? If not, no other file does anything.
