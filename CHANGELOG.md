@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+
+## [1.5.1] - 2026-10-22
 ### Fixed
 - "Buff my target" no longer treats the stranger WellMet itself just targeted as one you picked: before, the key kept recasting on the last person it buffed (and on a line-of-sight retry) instead of moving on.
 - A Paladin who has not learned the primary blessing now casts the secondary one on strangers, instead of skipping them.
