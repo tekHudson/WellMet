@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Fixed
+- A Paladin who has not learned the primary blessing now casts the secondary one on strangers, instead of skipping them.
 
 ## [1.5.0] - 2026-10-21
 ### Added

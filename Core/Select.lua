@@ -272,6 +272,11 @@ function Select.Pick(cands, ctx)
 			skipped[#skipped + 1] = { cand = cand, reason = why }
 			return
 		end
+		-- a Paladin who hasn't learned the primary blessing uses the strangers' secondary one instead, as a plain buff
+		if cand.tier == 2 and ctx.caster.mode == "assign" and not known(buffs[1]) then
+			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])
+			if secondary and known(secondary) then return add(cand, secondary, cfg) end
+		end
 		if isForced(cand) and ctx.caster.mode == "assign" then buffs = { buffs[1] } end     -- one blessing: the class's main one
 		if cand.tier == 2 and not isForced(cand) and ctx.caster.mode == "assign" then
 			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])

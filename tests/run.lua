@@ -2060,6 +2060,18 @@ do
 	best = Select.Pick({ tcand("t", 2) }, { now = 100, settings = tsettings(true), caster = pal, probe = probe({ has = { t = true }, state = { t = "other" }, share = { t = 0.9 } }) })
 	check("Paladin: a targeted stranger gets the main blessing over another's", best ~= nil and best.forced == true)
 
+	-- Paladin who doesn't know the primary blessing falls back to the secondary on strangers
+	do
+		local st = settings(); st.others = { enabled = true, radius = 0, assign = { MAGE = "KINGS" }, assign2 = { MAGE = "MIGHT" }, stack = {} }
+		local pr = probe({})
+		pr.known = function(b) return b.name ~= pal.buffs.KINGS.name end
+		local b = Select.Pick({ cand("s", 2) }, { now = 100, settings = st, caster = pal, probe = pr })
+		check("Paladin: primary not learned -> the secondary is cast on a stranger", b ~= nil and b.buff == pal.buffs.MIGHT)
+		pr.known = function() return true end
+		b = Select.Pick({ cand("s", 2) }, { now = 100, settings = st, caster = pal, probe = pr })
+		check("Paladin: primary learned -> the primary", b ~= nil and b.buff == pal.buffs.KINGS)
+	end
+
 	-- the real aura reader
 	local WM2, ns2, E2, W2 = load({ class = "MAGE" })
 	W2.spells["Arcane Intellect"] = 1459; W2.known[1459] = true
