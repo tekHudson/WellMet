@@ -60,7 +60,7 @@ local function names(caster)
 					if caster.mode == "stack" then
 						used = used or ns.StackEnabled(buff, class, section.stack)
 					else
-						used = used or ns.AssignedKey(section, class) == key
+						for _, k in ipairs(ns.PrioList(section, class)) do used = used or k == key end
 					end
 				end
 			end

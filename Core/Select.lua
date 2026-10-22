@@ -65,9 +65,9 @@ function Select.MemorySnapshot(now)
 end
 
 -- Which buffs does this target get? Returns a list of buffs, or nil + reason.
---   assign mode (Paladin): exactly one, chosen per target class.
+--   assign mode (Paladin): the blessings chosen for the target class, in order of preference (tier 2 = a stranger).
 --   stack mode  (Mage):    every buff switched on for the target class.
-function Select.BuffsFor(caster, class, cfg)
+function Select.BuffsFor(caster, class, cfg, tier)
 	if not class then return nil, "class not readable, so no buff is chosen" end
 	if caster.mode == "stack" then
 		local list = {}
@@ -78,21 +78,18 @@ function Select.BuffsFor(caster, class, cfg)
 		if #list == 0 then return nil, "no buffs are switched on for this class" end
 		return list
 	end
-	local key = cfg.assign[class] or ns.DefaultAssign[class]
-	if key == nil or key == "NONE" then return nil, "assignment: skip this class" end
-	local buff = caster.buffs[key]
-	if not buff then return nil, "no buff '" .. ns.SafeStr(key) .. "' for this caster" end
-	return { buff }
-end
-
--- The SECONDARY blessing for a stranger of this class (Paladin, Others section only), or nil.
--- Cast when the stranger already wears the primary from someone else. Ignored if it is the primary itself.
-function Select.SecondaryFor(caster, class, cfg, primary)
-	local key = cfg.assign2 and cfg.assign2[class]
-	if not key or key == "NONE" then return nil end
-	local buff = caster.buffs[key]
-	if not buff or buff == primary or buff.selfOnly then return nil end
-	return buff
+	-- assign mode: the class's blessings in order (empty slots and repeats are gone); a party-only spell is left out for strangers
+	local list, partyOnly = {}, nil
+	for _, key in ipairs(ns.PrioList(cfg, class)) do
+		local buff = caster.buffs[key]
+		if buff and not buff.selfOnly then
+			if buff.partyOnly and tier == 2 then partyOnly = partyOnly or buff else list[#list + 1] = buff end
+		end
+	end
+	if #list == 0 then
+		return nil, partyOnly and (partyOnly.name .. " only works on party and raid members") or "assignment: skip this class"
+	end
+	return list
 end
 
 -- The caster's own buff for one category (an aura, an armor), or nil (+ a reason when it can't be chosen).
@@ -206,33 +203,58 @@ function Select.Pick(cands, ctx)
 		end
 	end
 
-	-- Primary + secondary blessing for a stranger. A Paladin has only ONE blessing on a target at a time, so:
-	--   one of yours already there        -> nothing to do (a second cast would replace it)
-	--   no primary on them                -> the primary
-	--   primary there from someone else   -> the secondary, if they don't have it either
-	local function considerPair(cand, primary, secondary, cfg)
-		local sP, sS = probe.state(cand.unit, primary), probe.state(cand.unit, secondary)
+	-- Paladin: a target gets ONE of your blessings at a time, chosen from the class's ordered list:
+	--   one of yours already there                -> nothing to do, unless it is running out (a recast replaces it)
+	--   else the first one they don't have yet    -> it (the ones before it are on them from someone else)
+	--   all of them there from someone else       -> whichever is closest to running out (strangers only), else nothing
+	-- Blessings you haven't learned are skipped.
+	local function stateOf(cand, buff)
+		if probe.state then return probe.state(cand.unit, buff) end
+		local lacks = probe.lacks(cand.unit, buff)
+		if lacks == nil then return nil end
+		return lacks and "absent" or "other"
+	end
+	local function considerList(cand, list, cfg)
 		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
-		if sP == nil or sS == nil then return skip(primary, "aura info unavailable right now") end
+		local learned = {}
+		for _, buff in ipairs(list) do if known(buff) then learned[#learned + 1] = buff end end
+		-- your hand-picked target gets the first blessing you know, whatever is on them
+		if isForced(cand) then return add(cand, learned[1] or list[1], cfg) end
+		if #learned == 0 then return add(cand, list[1], cfg) end          -- says "... is not learned"
+		local states = {}
+		for i, buff in ipairs(learned) do
+			states[i] = stateOf(cand, buff)
+			if states[i] == nil then return skip(buff, "aura info unavailable right now") end
+		end
 		local chosen, note, share
-		if sP == "mine" then
-			share = refreshFraction(cand, primary)
-			if not share then return skip(primary, "already has your " .. primary.name) end
-			chosen = primary
-		elseif sS == "mine" then
-			share = refreshFraction(cand, secondary)
-			if not share then return skip(secondary, "already has your " .. secondary.name) end
-			chosen = secondary
-		elseif sP == "absent" then
-			chosen = primary
-		elseif sS == "absent" then
-			chosen, note = secondary, primary.name .. " is on them from someone else, so " .. secondary.name .. " instead"
-		else
-			-- both are on them from others: recast whichever is closer to running out (strangers only, so replacing is fine)
-			local shareP, shareS = refreshFraction(cand, primary), refreshFraction(cand, secondary)
-			if shareP and (not shareS or shareP <= shareS) then chosen, share = primary, shareP
-			elseif shareS then chosen, share = secondary, shareS
-			else return skip(primary, "already has " .. primary.name .. " and " .. secondary.name .. " (from others)") end
+		for i, buff in ipairs(learned) do
+			if states[i] == "mine" then
+				share = refreshFraction(cand, buff)
+				if not share then return skip(buff, "already has your " .. buff.name) end
+				chosen = buff
+				break
+			end
+		end
+		if not chosen then
+			for i, buff in ipairs(learned) do
+				if states[i] == "absent" then
+					chosen = buff
+					if i > 1 then note = learned[i - 1].name .. " is on them from someone else, so " .. buff.name .. " instead" end
+					break
+				end
+			end
+		end
+		if not chosen then
+			-- all of them are on them from others: recast whichever is closest to running out
+			for _, buff in ipairs(learned) do
+				local sh = refreshFraction(cand, buff)
+				if sh and (not share or sh < share) then chosen, share = buff, sh end
+			end
+			if not chosen then
+				local names = {}
+				for _, buff in ipairs(learned) do names[#names + 1] = buff.name end
+				return skip(learned[1], "already has " .. table.concat(names, " and ") .. (#learned > 1 and " (from others)" or ""))
+			end
 		end
 		local reason, dist = whyNot(cand, chosen, cfg, true)
 		if reason then return skip(chosen, reason) end
@@ -267,21 +289,12 @@ function Select.Pick(cands, ctx)
 			local want = ctx.caster.buffs[req.buff]
 			if want and not want.selfOnly then return add(cand, want, cfg) end
 		end
-		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, cfg)
+		local buffs, why = Select.BuffsFor(ctx.caster, cand.class, cfg, cand.tier)
 		if not buffs then
 			skipped[#skipped + 1] = { cand = cand, reason = why }
 			return
 		end
-		-- a Paladin who hasn't learned the primary blessing uses the strangers' secondary one instead, as a plain buff
-		if cand.tier == 2 and ctx.caster.mode == "assign" and not known(buffs[1]) then
-			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])
-			if secondary and known(secondary) then return add(cand, secondary, cfg) end
-		end
-		if isForced(cand) and ctx.caster.mode == "assign" then buffs = { buffs[1] } end     -- one blessing: the class's main one
-		if cand.tier == 2 and not isForced(cand) and ctx.caster.mode == "assign" then
-			local secondary = Select.SecondaryFor(ctx.caster, cand.class, cfg, buffs[1])
-			if secondary then return considerPair(cand, buffs[1], secondary, cfg) end
-		end
+		if ctx.caster.mode == "assign" then return considerList(cand, buffs, cfg) end
 		for _, buff in ipairs(buffs) do add(cand, buff, cfg) end
 	end
 

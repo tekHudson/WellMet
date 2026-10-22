@@ -8,7 +8,7 @@ Bind one key. Each press buffs **you**, then the **next person nearby who needs 
 
 | Class | What it buffs | Extra for yourself |
 |---|---|---|
-| **Paladin** | One blessing per class: Might, Wisdom, Kings, Salvation (group and you only) or Light. For strangers, an optional secondary blessing when someone else already gave them your primary | Aura (Devotion by default), optional Righteous Fury |
+| **Paladin** | An ordered list of blessings per class (up to five slots, set per section): Might, Wisdom, Kings, Salvation (group and you only) or Light. The key casts the first one you've learned that they don't already have from someone else | Aura (Devotion by default), optional Righteous Fury |
 | **Mage** | Arcane Intellect, optional Dampen or Amplify Magic (group and you only) | Armor (best Frost/Ice Armor you've learned, or Mage Armor) |
 | **Druid** | Mark of the Wild, optional Thorns | none |
 | **Priest** | Power Word: Fortitude, Divine Spirit, optional Shadow Protection | Inner Fire |

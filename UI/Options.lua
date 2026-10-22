@@ -41,7 +41,7 @@ end
 
 -- Assign mode (Paladin): the caster's buffs (icon + name in the open list) and "Skip". The closed
 -- dropdown shows just the icon (assignIcon).
-local function assignOptions(caster, sectionKey, secondary)
+local function assignOptions(caster, sectionKey, slot)
 	local options = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
@@ -49,8 +49,20 @@ local function assignOptions(caster, sectionKey, secondary)
 			options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
 		end
 	end
-	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. (secondary and " No fallback" or " Skip this class") }
+	options[#options + 1] = { value = "NONE", label = iconText(SKIP_ICON) .. ((slot or 1) > 1 and " Nothing" or " Skip this class") }
 	return options
+end
+
+local ORDINALS = { "1st", "2nd", "3rd", "4th", "5th" }
+local SLOT_STEP = 62          -- the blessing dropdowns of one class sit this far apart
+
+-- How many blessing slots a section offers: every blessing it can use (strangers can't get the party-only ones).
+local function slotCount(caster, sectionKey)
+	local n = 0
+	for _, key in ipairs(caster.order) do
+		if not (caster.buffs[key].partyOnly and sectionKey == "others") then n = n + 1 end
+	end
+	return math.min(n, #ns.PRIO_FIELDS)
 end
 
 local function assignIcon(caster, value)
@@ -345,7 +357,7 @@ local function buildSetAll(panel, sectionKey, y)
 					local isNone = key == "NONE"
 					add(isNone and SKIP_ICON or ns.SpellIcon(buff), isNone or unknownBuff(buff),
 						{ title = isNone and noneName or buff.name,
-						  all = isNone and "Every class is set to this." or "Every class has it. Click to clear them all.",
+						  all = isNone and "Every class is set to this." or "Every class has it here. Click to clear them all.",
 						  some = isNone and "Click to set every class to this." or "Click to give it to all.",
 						  none = "Click to set every class to this." },
 						function() return ns.AssignCount(cfg, field, key) end,
@@ -353,8 +365,9 @@ local function buildSetAll(panel, sectionKey, y)
 				end
 			end)
 		end
-		assignRow(sectionKey == "others" and "Primary" or "Blessing", "assign", "Skip these classes")
-		if sectionKey == "others" then assignRow("Secondary", "assign2", "No fallback") end
+		for n = 1, slotCount(caster, sectionKey) do
+			assignRow(ORDINALS[n] .. " choice", ns.PRIO_FIELDS[n], n == 1 and "Skip these classes" or "Nothing in this slot")
+		end
 	end
 	return y - 6
 end
@@ -362,19 +375,26 @@ end
 -- The "which buffs on which class" table for one section (Party / Raid or Others): one row per target class,
 -- alphabetical by displayed name. Assign mode (Paladin): a one-choice dropdown. Stack mode (Mage, Druid): a
 -- checkbox dropdown. Returns the y below the table.
+local function refreshAllSlots(panel)
+	if panel.refreshBulk then panel.refreshBulk() end
+	for _, r in ipairs(panel.refreshers) do r() end      -- a swap changes another slot of the same class too
+end
+
 local function buildClassTable(panel, sectionKey, y)
 	local caster = WM.caster
 	local cfg = WM.db[sectionKey]
 	local classes = { unpack(ns.TargetClasses) }
 	table.sort(classes, function(a, b) return className(a):lower() < className(b):lower() end)
-	-- Strangers get a fallback: a Paladin has one blessing per target, so when the primary is already on someone
-	-- from another Paladin, the secondary is cast instead. (In a group people agree who casts what.)
-	local withSecondary = caster.mode == "assign" and sectionKey == "others"
-	if withSecondary then
-		local first = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-		first:SetPoint("TOPLEFT", 150, y + 4); first:SetText("Primary")
-		local second = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-		second:SetPoint("TOPLEFT", 240, y + 4); second:SetText("Secondary (if they have the primary)")
+	-- A Paladin gives a target ONE blessing, so each class has an ordered list: the key casts the first one you have
+	-- learned that they don't already have from someone else.
+	local slots = caster.mode == "assign" and slotCount(caster, sectionKey) or 0
+	if slots > 0 then
+		makeText(panel, "In order: the key casts the first blessing you have learned that they don't already have (from anyone).", 24, y)
+		y = y - 26
+		for n = 1, slots do
+			local head = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
+			head:SetPoint("TOPLEFT", 150 + (n - 1) * SLOT_STEP, y + 4); head:SetText(ORDINALS[n])
+		end
 		y = y - 12
 	end
 	for _, class in ipairs(classes) do
@@ -401,18 +421,19 @@ local function buildClassTable(panel, sectionKey, y)
 					return table.concat(parts)
 				end)
 		else
-			dd = makeDropdown(panel, name, 70, 150, y + 2, function() return assignOptions(caster, sectionKey) end,
-				function() return ns.AssignedKey(cfg, class) end,
-				function(v) cfg.assign[class] = v; if panel.refreshBulk then panel.refreshBulk() end end,
+			dd = makeDropdown(panel, name, SLOT_STEP - 6, 150, y + 2, function() return assignOptions(caster, sectionKey, 1) end,
+				function() return ns.PrioSlot(cfg, class, 1) end,
+				function(v) ns.PrioSet(cfg, class, 1, v); refreshAllSlots(panel) end,
 				function(value) return assignIcon(caster, value) end)
 		end
 		panel.refreshers[#panel.refreshers + 1] = dd.refresh
-		if withSecondary then
-			local dd2 = makeDropdown(panel, name .. "Second", 70, 240, y + 2, function() return assignOptions(caster, sectionKey, true) end,
-				function() return cfg.assign2[class] or "NONE" end,
-				function(v) cfg.assign2[class] = v; if panel.refreshBulk then panel.refreshBulk() end end,
+		for n = 2, slots do
+			local ddn = makeDropdown(panel, name .. (n == 2 and "Second" or ("Slot" .. n)), SLOT_STEP - 6, 150 + (n - 1) * SLOT_STEP, y + 2,
+				function() return assignOptions(caster, sectionKey, n) end,
+				function() return ns.PrioSlot(cfg, class, n) end,
+				function(v) ns.PrioSet(cfg, class, n, v); refreshAllSlots(panel) end,
 				function(value) return assignIcon(caster, value) end)
-			panel.refreshers[#panel.refreshers + 1] = dd2.refresh
+			panel.refreshers[#panel.refreshers + 1] = ddn.refresh
 		end
 		y = y - 30
 	end
@@ -475,10 +496,18 @@ local function buildSelfPanel(caster, subtitle)
 					return table.concat(parts)
 				end)
 		else
-			dd = makeDropdown(panel, "WellMetSelfOwn", 70, 170, y + 2, function() return assignOptions(caster, "self") end,
-				function() return ns.AssignedKey(cfg, class) end,
-				function(v) cfg.assign[class] = v end,
+			dd = makeDropdown(panel, "WellMetSelfOwn", SLOT_STEP - 6, 170, y + 2, function() return assignOptions(caster, "self", 1) end,
+				function() return ns.PrioSlot(cfg, class, 1) end,
+				function(v) ns.PrioSet(cfg, class, 1, v); refreshAllSlots(panel) end,
 				function(value) return assignIcon(caster, value) end)
+			for n = 2, slotCount(caster, "self") do
+				local ddn = makeDropdown(panel, "WellMetSelfOwn" .. n, SLOT_STEP - 6, 170 + (n - 1) * SLOT_STEP, y + 2,
+					function() return assignOptions(caster, "self", n) end,
+					function() return ns.PrioSlot(cfg, class, n) end,
+					function(v) ns.PrioSet(cfg, class, n, v); refreshAllSlots(panel) end,
+					function(value) return assignIcon(caster, value) end)
+				panel.refreshers[#panel.refreshers + 1] = ddn.refresh
+			end
 		end
 		panel.refreshers[#panel.refreshers + 1] = dd.refresh
 		y = y - 36

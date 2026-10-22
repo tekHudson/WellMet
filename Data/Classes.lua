@@ -34,7 +34,7 @@ local MANA_CLASSES = { PALADIN = true, PRIEST = true, SHAMAN = true, MAGE = true
 ns.CasterData = {
 	PALADIN = {
 		mode = "assign",
-		title = "Which blessing on which class",
+		title = "Which blessings on which class, in order",
 		-- Every blessing you keep up for an hour on Forever (spellbook, checked 2026-10-06): Might (level 4), Wisdom (14),
 		-- Kings (20), Salvation (26), Light (40); the Greater versions count as "has it". A Paladin can only have ONE
 		-- blessing on a target at a time, so the per-class choice is one blessing (or none). Left out on purpose because
@@ -135,11 +135,19 @@ for _, caster in pairs(ns.CasterData) do
 	end
 end
 
--- Default blessing per target class (all editable in settings). "NONE" skips the class.
-ns.DefaultAssign = {
-	WARRIOR = "MIGHT", ROGUE = "MIGHT",
-	HUNTER = "WISDOM", PALADIN = "WISDOM", PRIEST = "WISDOM", SHAMAN = "WISDOM",
-	MAGE = "WISDOM", WARLOCK = "WISDOM", DRUID = "WISDOM",
+-- Default blessings per target class, in order (all editable in settings). The key casts the first one that is learned
+-- and not already on them, so Kings is listed first for everyone and Might / Wisdom take over until it is learned.
+-- Salvation is not in the defaults (it cuts threat; add it yourself where you want it).
+ns.DefaultPrio = {
+	WARRIOR = { "KINGS", "MIGHT" },
+	ROGUE   = { "KINGS", "MIGHT" },
+	HUNTER  = { "KINGS", "MIGHT", "WISDOM" },
+	MAGE    = { "KINGS", "WISDOM" },
+	WARLOCK = { "KINGS", "WISDOM" },
+	PRIEST  = { "KINGS", "WISDOM", "LIGHT" },
+	DRUID   = { "KINGS", "WISDOM", "LIGHT" },
+	SHAMAN  = { "KINGS", "WISDOM", "LIGHT" },
+	PALADIN = { "KINGS", "WISDOM", "LIGHT" },
 }
 
 -- Does this character's class have buffs in WellMet? If not, no other file does anything.
