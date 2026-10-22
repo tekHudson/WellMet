@@ -1768,7 +1768,7 @@ do
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
 		and menuOf(E.g.WellMetOthersClassWARRIOR)[3].selected)
-	menuOf(E.g.WellMetOthersClassWARRIOR)[5].pick()          -- the last item in Others is Skip (Salvation is not offered there)
+	menuOf(E.g.WellMetOthersClassWARRIOR)[4].pick()          -- the last item in Others is Skip (neither Salvation nor Light is offered there)
 	check("...each section keeps its own table (Others: Skip, Party / Raid: Wisdom)", WM.db.others.assign.WARRIOR == "NONE" and WM.db.party.assign.WARRIOR == "WISDOM")
 	WM.db.party.radius = 0
 	for _, f in ipairs(ns.PRIO_FIELDS) do WM.db.party[f].WARRIOR = nil; WM.db.others[f].WARRIOR = nil end     -- leave the settings as found
