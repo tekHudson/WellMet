@@ -1206,8 +1206,8 @@ do
 	end
 	check("Party / Raid dropdown offers all five blessings plus Skip",
 		table.concat(items(E.g.WellMetPartyClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
-	check("Others dropdown leaves Salvation out (strangers can't get it)",
-		table.concat(items(E.g.WellMetOthersClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,LIGHT,NONE")
+	check("Others dropdown leaves Salvation and Light out (not for strangers)",
+		table.concat(items(E.g.WellMetOthersClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,NONE")
 	check("the Self 'Blessing' dropdown offers all five", table.concat(items(E.g.WellMetSelfOwn), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
 
 	-- the "nobody needs ..." line names only the blessings that are assigned somewhere
@@ -1304,8 +1304,10 @@ do
 	local bs = ns.Select.Pick({ { unit = "player", key = "me", name = "Me", tier = 0, class = "PALADIN", order = 0 } },
 		{ now = 100, settings = sSelf, caster = WM.caster, probe = probeOf({ KINGS = "other", WISDOM = "absent" }) })
 	check("on yourself too: Kings from another Paladin means your 2nd choice", bs and bs.buff.key == "WISDOM")
-	local bl = run({ KINGS = "other", MIGHT = "other", LIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" }, assign3 = { WARRIOR = "LIGHT" } })
-	check("a 3rd choice is used when the first two are on them from others", bl and bl.buff.key == "LIGHT")
+	local bl = run({ KINGS = "other", MIGHT = "other", WISDOM = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" }, assign3 = { WARRIOR = "WISDOM" } })
+	check("a 3rd choice is used when the first two are on them from others", bl and bl.buff.key == "WISDOM")
+	local bn, skn = run({ KINGS = "other", LIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "LIGHT" } })
+	check("Light is never cast on a stranger", bn == nil and skn[1].reason:find("already has Blessing of Kings", 1, true) ~= nil)
 	-- never Salvation on a tank in your group
 	local tankM = { unit = "party1", key = "G-t", name = "Tank", tier = 1, class = "WARRIOR", order = 1, tank = true }
 	local sTank = mkSettings({}); sTank.party.assign = { WARRIOR = "SALVATION" }; sTank.party.assign2 = { WARRIOR = "KINGS" }
@@ -1363,9 +1365,9 @@ do
 	check("...and the debug log says why", WM:BuildReport():find("on them from someone else, so Blessing of Might instead", 1, true) ~= nil)
 
 	-- settings: every section has one dropdown per slot (Others one fewer: no Salvation)
-	check("every class has a dropdown per slot: 5 on Party / Raid and Self, 4 on Others",
+	check("every class has a dropdown per slot: 5 on Party / Raid and Self, 3 on Others",
 		E.g.WellMetPartyClassWARRIORSlot5 ~= nil and E.g.WellMetPartyClassWARRIORSlot6 == nil and E.g.WellMetSelfOwn5 ~= nil
-		and E.g.WellMetOthersClassWARRIORSlot4 ~= nil and E.g.WellMetOthersClassWARRIORSlot5 == nil and E.g.WellMetOthersClassWARRIORSecond ~= nil)
+		and E.g.WellMetOthersClassWARRIORSlot3 ~= nil and E.g.WellMetOthersClassWARRIORSlot4 == nil and E.g.WellMetOthersClassWARRIORSecond ~= nil)
 	local function items(dd)
 		local list = {}
 		dd.menuGen(dd, { CreateRadio = function(_, label, isSel, _, data) list[#list + 1] = { data = data, label = label, on = isSel() }; return { SetTooltip = function() end } end })
@@ -1374,9 +1376,9 @@ do
 	local second = items(E.g.WellMetOthersClassWARRIORSecond)
 	local seq = {}
 	for _, it in ipairs(second) do seq[#seq + 1] = it.data end
-	check("a later slot lists the blessings you can give a stranger (no Salvation) and 'Nothing'",
-		table.concat(seq, ",") == "MIGHT,WISDOM,KINGS,LIGHT,NONE" and second[5].label:find("Nothing", 1, true) ~= nil)
-	check("...and it shows the saved 2nd choice (Might) as selected", second[1].on and not second[5].on)
+	check("a later slot lists the blessings you can give a stranger (no Salvation, no Light) and 'Nothing'",
+		table.concat(seq, ",") == "MIGHT,WISDOM,KINGS,NONE" and second[4].label:find("Nothing", 1, true) ~= nil)
+	check("...and it shows the saved 2nd choice (Might) as selected", second[1].on and not second[4].on)
 	E.g.WellMetOthersClassWARRIORSecond.menuGen(E.g.WellMetOthersClassWARRIORSecond, { CreateRadio = function(_, _, _, set, data) if data == "WISDOM" then set() end; return { SetTooltip = function() end } end })
 	check("picking a 2nd choice saves it for Others only", WM.db.others.assign2.WARRIOR == "WISDOM" and WM.db.party.assign2.WARRIOR == nil)
 	local fresh, fns = load({ others = false })

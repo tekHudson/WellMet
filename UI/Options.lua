@@ -45,7 +45,7 @@ local function assignOptions(caster, sectionKey, slot)
 	local options = {}
 	for _, key in ipairs(caster.order) do
 		local buff = caster.buffs[key]
-		if not (buff.partyOnly and sectionKey == "others") then       -- party-only spells are never offered for strangers
+		if not ((buff.partyOnly or buff.noStrangers) and sectionKey == "others") then       -- never offered for strangers
 			options[#options + 1] = { value = key, label = buffLabel(buff), unknown = unknownBuff(buff) }
 		end
 	end
@@ -60,7 +60,7 @@ local SLOT_STEP = 62          -- the blessing dropdowns of one class sit this fa
 local function slotCount(caster, sectionKey)
 	local n = 0
 	for _, key in ipairs(caster.order) do
-		if not (caster.buffs[key].partyOnly and sectionKey == "others") then n = n + 1 end
+		if not ((caster.buffs[key].partyOnly or caster.buffs[key].noStrangers) and sectionKey == "others") then n = n + 1 end
 	end
 	return math.min(n, #ns.PRIO_FIELDS)
 end

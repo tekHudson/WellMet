@@ -7,7 +7,7 @@ One key buffs the next nearby player who needs it. Built for **WoW Forever** (In
 Stand at a campfire or run through town, press the key, and your buff goes on someone nearby who
 doesn't have it. Press again and it moves on to the next person.
 
-WellMet is for classes that buff **other players**: **Paladin** (Blessing of Might, Wisdom, Kings, Salvation or Light; each target class has an ordered list, up to five slots, and the key casts the first one you have learned that they don't already have from someone else, so Kings from another Paladin means your 2nd choice; the defaults start with Kings and then Might or Wisdom; Salvation is for your group only), **Mage**
+WellMet is for classes that buff **other players**: **Paladin** (Blessing of Might, Wisdom, Kings, Salvation or Light; each target class has an ordered list, up to five slots, and the key casts the first one you have learned that they don't already have from someone else, so Kings from another Paladin means your 2nd choice; the defaults start with Kings and then Might or Wisdom; Salvation and Light are for you and your group only, not strangers), **Mage**
 (Arcane Intellect, plus optional Dampen / Amplify Magic for your group, ticked per class), **Druid** (Mark of the Wild, optionally
 Thorns) and **Priest** (Power Word: Fortitude, Divine Spirit and optionally Shadow Protection, ticked per class; the
 group versions count as already having them).

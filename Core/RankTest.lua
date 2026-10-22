@@ -37,7 +37,7 @@ end
 local function testBuff(cand)
 	for _, key in ipairs(WM.caster.order) do
 		local buff = WM.caster.buffs[key]
-		if not buff.selfOnly and not (buff.partyOnly and cand.tier == 2) and ns.IsKnown(buff) and #ns.Ranks(buff.name) >= 2 then
+		if not buff.selfOnly and not ((buff.partyOnly or buff.noStrangers) and cand.tier == 2) and ns.IsKnown(buff) and #ns.Ranks(buff.name) >= 2 then
 			return buff
 		end
 	end

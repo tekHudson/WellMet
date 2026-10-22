@@ -83,7 +83,8 @@ function Select.BuffsFor(caster, class, cfg, tier)
 	for _, key in ipairs(ns.PrioList(cfg, class)) do
 		local buff = caster.buffs[key]
 		if buff and not buff.selfOnly then
-			if buff.partyOnly and tier == 2 then partyOnly = partyOnly or buff else list[#list + 1] = buff end
+			if buff.partyOnly and tier == 2 then partyOnly = partyOnly or buff elseif buff.noStrangers and tier == 2 then -- left out
+			else list[#list + 1] = buff end
 		end
 	end
 	if #list == 0 then
@@ -159,6 +160,7 @@ function Select.Pick(cands, ctx)
 	-- when it is a refresh of a buff that is running out).
 	local function whyNot(cand, buff, cfg, skipAura)
 		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
+		if buff.noStrangers and cand.tier == 2 then return buff.name .. " is not cast on strangers" end
 		if not known(buff) then return buff.name .. " is not learned" end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
 		if blocked then return string.format("tried recently (%.0fs left)", left) end

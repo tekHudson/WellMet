@@ -55,7 +55,7 @@ local function names(caster)
 		local used = false
 		for _, sectionKey in ipairs(ns.SECTIONS) do
 			local section = WM.db[sectionKey]
-			if section.enabled and not (buff.partyOnly and sectionKey == "others") then
+			if section.enabled and not ((buff.partyOnly or buff.noStrangers) and sectionKey == "others") then
 				for _, class in ipairs(ns.TargetClasses) do
 					if caster.mode == "stack" then
 						used = used or ns.StackEnabled(buff, class, section.stack)

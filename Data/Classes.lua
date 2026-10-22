@@ -23,6 +23,7 @@ ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 --                "stack":  several buffs per target, each switched on/off per target class (Mage).
 --   tags      = the words a player can ask for it with in chat (!bom, !fort ...), first one is the one the announce shows (Core/Requests.lua)
 --   partyOnly = true: the spell works on "party member"s only, so strangers are never offered it.
+--   noStrangers = true: not offered for strangers either (Blessing of Light: a healer's buff, not for a passer-by).
 --   stack buffs also carry: defaultClasses (target classes it is ON for by default) and exclusive (the buff it replaces, so only one of the two can be on for a class).
 --   selfCategories = the caster's OWN buffs, one choice per category (an aura, an armor), cast on yourself
 --   first. A category is { key, title, default = <buff key | "AUTO" | "NONE">, choices = { buff keys },
@@ -47,7 +48,7 @@ ns.CasterData = {
 			KINGS  = { key = "KINGS", tags = { "bok", "kings" },  name = "Blessing of Kings",  alt = { "Greater Blessing of Kings" },  icon = "Interface\\Icons\\Spell_Magic_MageArmor" },
 			SALVATION = { key = "SALVATION", tags = { "bos", "salvation", "salv" }, name = "Blessing of Salvation", alt = { "Greater Blessing of Salvation" }, partyOnly = true,
 			              icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation" },
-			LIGHT  = { key = "LIGHT", tags = { "bol", "light" },  name = "Blessing of Light",  alt = { "Greater Blessing of Light" },  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
+			LIGHT  = { key = "LIGHT", tags = { "bol", "light" },  name = "Blessing of Light",  alt = { "Greater Blessing of Light" }, noStrangers = true,  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
 			DEVOTION      = { key = "DEVOTION",      selfOnly = true, name = "Devotion Aura",          icon = "Interface\\Icons\\Spell_Holy_DevotionAura" },
 			RETRIBUTION   = { key = "RETRIBUTION",   selfOnly = true, name = "Retribution Aura",       icon = "Interface\\Icons\\Spell_Holy_AuraOfLight" },
 			CONCENTRATION = { key = "CONCENTRATION", selfOnly = true, name = "Concentration Aura",     icon = "Interface\\Icons\\Spell_Holy_MindSooth" },
