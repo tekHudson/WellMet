@@ -726,6 +726,11 @@ end
 -- opening clears it.
 local STEP = 0.1
 function WM:OpenKeyBindings()
+	if InCombatLockdown() then
+		WM.pendingOpen = function() WM:OpenKeyBindings() end
+		WM:Print("In combat: the key bindings will open when combat ends.")
+		return
+	end
 	Settings.OpenToCategory(Settings.KEYBINDINGS_CATEGORY_ID)
 	C_Timer.After(STEP, function() SettingsPanel.SearchBox:SetText(BINDING_HEADER_WELLMET) end)
 end
@@ -743,6 +748,12 @@ end
 -- Open the settings, optionally on one section ("self", "party", "others"). A switched-off section has no
 -- page, so that opens the main page and says why.
 function WM:OpenOptions(sectionKey)
+	-- Opening the settings is blocked in combat: remember the request and open when combat ends.
+	if InCombatLockdown() then
+		WM.pendingOpen = function() WM:OpenOptions(sectionKey) end
+		WM:Print("In combat: the settings will open when combat ends.")
+		return
+	end
 	local category = WM.optionsCategory
 	if sectionKey and WM.optionsExtra and WM.optionsExtra[sectionKey] then
 		category = WM.optionsExtra[sectionKey]
