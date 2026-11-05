@@ -197,5 +197,10 @@ function WM:CreateStrip()
 end
 
 function WM:PLAYER_REGEN_DISABLED() WM:RefreshStrip() end
-function WM:PLAYER_REGEN_ENABLED() WM:RefreshStrip() end
+function WM:PLAYER_REGEN_ENABLED()
+	WM:RefreshStrip()
+	local open = WM.pendingOpen
+	WM.pendingOpen = nil
+	if open then open() end
+end
 function WM:GROUP_ROSTER_UPDATE() WM:RefreshStrip() end

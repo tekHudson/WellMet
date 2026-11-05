@@ -1036,6 +1036,11 @@ do
 	check("OpenOptions('party') opens the Party / Raid sub-panel", W.openedCategory == WM.optionsSub.party:GetID() and WM.optionsSub.party:GetID() ~= WM.optionsCategory:GetID())
 	WM:OpenOptions()
 	check("OpenOptions() opens the main panel", W.openedCategory == 1)
+	W.openedCategory = nil; W.combat = true
+	WM:OpenOptions("party")
+	check("OpenOptions in combat does not open yet", W.openedCategory == nil)
+	W.combat = false; WM:PLAYER_REGEN_ENABLED()
+	check("...and opens the queued section when combat ends", W.openedCategory == WM.optionsSub.party:GetID())
 	local slash = E.g.SlashCmdList.WELLMET
 	-- the three section checkboxes are one row, left to right, with no Open buttons
 	local ps, pp, po = E.g.WellMetShowSelf.lastPoint, E.g.WellMetShowParty.lastPoint, E.g.WellMetShowOthers.lastPoint

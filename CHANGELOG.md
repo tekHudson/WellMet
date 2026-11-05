@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-11-04
+### Fixed
+- Opening the settings (`/wmet` or the minimap icon) during combat no longer errors: it waits and opens when combat ends.
+
 ## [1.6.0] - 2026-10-22
 ### Added
 - Salvation is never cast on a tank in your group (the assigned Tank role or the raid main-tank mark), whatever the lists say.
