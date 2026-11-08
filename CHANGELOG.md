@@ -6,6 +6,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-07
+### Fixed
+- A blessing the target is too low level for is no longer cast: Blessing of Kings (learned at 20) was tried on characters below level 10. It is skipped and the next blessing in the class's list is used instead.
+
 ## [1.6.1] - 2026-11-04
 ### Fixed
 - Opening the settings (`/wmet` or the minimap icon) during combat no longer errors: it waits and opens when combat ends.
