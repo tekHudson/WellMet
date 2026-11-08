@@ -337,6 +337,7 @@ do
 			inRange = function(_, unit) if opts.range and opts.range[unit] ~= nil then return opts.range[unit] end return true end,
 			lacks = function(unit) if opts.has and opts.has[unit] == "unknown" then return nil end if opts.has and opts.has[unit] then return false end return true end,
 			distance = function(c) return opts.dist and opts.dist[c.key] or nil end,
+			tooLow = function(buff, unit) return opts.tooLow and opts.tooLow[unit .. "|" .. buff.key] or false end,
 		}
 	end
 	local function settings(over) return mkSettings(over) end
@@ -358,6 +359,8 @@ do
 	check("skips someone who already has the buff", #skipped == 1 and skipped[1].reason:find("already has", 1, true) ~= nil)
 	_, skipped = Select.Pick({ cand("u", 2, "MAGE") }, ctx(probe({ has = { u = "unknown" } })))
 	check("skips (not buffs) when aura info is unreadable", #skipped == 1 and skipped[1].reason:find("unavailable", 1, true) ~= nil)
+	_, skipped = Select.Pick({ cand("lo", 2, "MAGE") }, ctx(probe({ tooLow = setmetatable({}, { __index = function() return true end }) })))
+	check("skips a target too low level for the buff", #skipped == 1 and skipped[1].reason:find("too low level", 1, true) ~= nil)
 	_, skipped = Select.Pick({ cand("o", 2, "MAGE") }, ctx(probe({ range = { o = false } })))
 	check("skips out of cast range", skipped[1] and skipped[1].reason == "out of cast range")
 	_, skipped = Select.Pick({ cand("o", 2, "MAGE") }, ctx(probe({ range = { o = false } })))

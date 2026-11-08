@@ -162,6 +162,7 @@ function Select.Pick(cands, ctx)
 		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
 		if buff.noStrangers and cand.tier == 2 then return buff.name .. " is not cast on strangers" end
 		if not known(buff) then return buff.name .. " is not learned" end
+		if probe.tooLow and probe.tooLow(buff, cand.unit) then return "target is too low level for " .. buff.name end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
 		if blocked then return string.format("tried recently (%.0fs left)", left) end
 		if cand.tier ~= 0 then
@@ -220,7 +221,7 @@ function Select.Pick(cands, ctx)
 		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
 		local learned = {}
 		for _, buff in ipairs(list) do
-			if known(buff) and not (cand.tank and buff.key == "SALVATION") then learned[#learned + 1] = buff end     -- never Salvation on a tank
+			if known(buff) and not (probe.tooLow and probe.tooLow(buff, cand.unit)) and not (cand.tank and buff.key == "SALVATION") then learned[#learned + 1] = buff end     -- never Salvation on a tank
 		end
 		if #learned == 0 and cand.tank and #list == 1 and list[1].key == "SALVATION" then
 			return skip(list[1], "a tank: Salvation is never cast on one")

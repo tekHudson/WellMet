@@ -106,6 +106,16 @@ function ns.RankFor(buff, targetLevel, targetKey)
 	return chosen, true
 end
 
+-- True when even your LOWEST rank of `buff` is too high for the unit (a one-rank buff such as Blessing of Kings, learned at 20,
+-- is refused on a level 9). False when the level or the ranks can't be read.
+function ns.TooLowLevel(buff, unit)
+	local level = UnitLevel(unit)
+	if not readable(level) or type(level) ~= "number" or level < 1 then return false end
+	local ranks = ns.Ranks(buff.name)
+	local lowest = ranks[#ranks]
+	return lowest ~= nil and lowest.level - ns.RANK_LEVEL_GAP > level
+end
+
 -- Re-resolve ids for the caster's buffs (login, and when spells change).
 function WM:InitSpells()
 	for k in pairs(rankCache) do rankCache[k] = nil end
@@ -239,6 +249,7 @@ end
 ns.Probe = {
 	known    = ns.IsKnown,
 	inRange  = ns.InRange,
+	tooLow   = ns.TooLowLevel,
 	lacks    = ns.Lacks,
 	state    = ns.AuraState,
 	remaining = ns.AuraRemaining,
