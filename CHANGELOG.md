@@ -5,6 +5,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 [Semantic Versioning](https://semver.org).
 
 ## [Unreleased]
+### Removed
+- Blessing of Light (`!bol`) and Blessing of Salvation (`!bos`): neither is in WoW Forever. Settings that still held them have that slot emptied, and a saved chat request for them is forgotten. With Salvation gone, so is the rule that kept it off tanks.
 
 ## [1.7.0] - 2026-11-07
 ### Fixed

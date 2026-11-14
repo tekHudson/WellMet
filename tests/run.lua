@@ -1137,6 +1137,12 @@ do
 	WM3:InitDB()
 	check("migrating twice changes nothing", WM3.db.party.radius == 28 and WM3.db.self.enabled == false)
 
+	-- Blessing of Light is gone: a saved slot with it is emptied, a saved request for it forgotten, the rest kept
+	E3.g.WellMetDB = { profile = { schema = 2, party = { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "LIGHT" }, assign3 = { WARRIOR = "SALVATION" } }, requests = { list = { a = { buff = "LIGHT" }, c = { buff = "SALVATION" }, b = { buff = "MIGHT" } } } } }
+	WM3:InitDB()
+	check("saved Light / Salvation slots become empty, requests for them are dropped, other choices stay",
+		WM3.db.party.assign2.WARRIOR == "NONE" and WM3.db.party.assign3.WARRIOR == "NONE" and WM3.db.requests.list.c == nil and WM3.db.party.assign.WARRIOR == "KINGS" and WM3.db.requests.list.a == nil and WM3.db.requests.list.b.buff == "MIGHT")
+
 	-- the macro button
 	local WM4, ns4, E4, W4 = load()
 	WM4:CreateMacro()
@@ -1165,20 +1171,19 @@ do
 end
 
 ----------------------------------------------------------------------
-print("== Paladin blessings (Kings, Salvation, Light)")
+print("== Paladin blessings (Might, Wisdom, Kings)")
 do
 	local WM, ns, E, W = load()
 	local function learn(list) for name, id in pairs(list) do W.spells[name] = id; W.known[id] = true end end
-	learn({ ["Blessing of Kings"] = 20217, ["Blessing of Salvation"] = 1038, ["Blessing of Light"] = 19977 })
+	learn({ ["Blessing of Kings"] = 20217 })
 	local P = WM.caster.buffs
 	local keys = {}
 	for _, k in ipairs(WM.caster.order) do keys[#keys + 1] = k end
-	check("Paladin blessings: Might, Wisdom, Kings, Salvation, Light",
-		table.concat(keys, ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT" and P.KINGS.name == "Blessing of Kings"
-		and P.SALVATION.name == "Blessing of Salvation" and P.LIGHT.name == "Blessing of Light")
+	check("Paladin blessings: Might, Wisdom, Kings (no Light or Salvation: not in Forever)",
+		table.concat(keys, ",") == "MIGHT,WISDOM,KINGS" and P.LIGHT == nil and P.SALVATION == nil and P.KINGS.name == "Blessing of Kings")
 	check("the short utility blessings (Protection, Freedom, Sacrifice) and Sanctuary are not in the data",
 		P.PROTECTION == nil and P.FREEDOM == nil and P.SACRIFICE == nil and P.SANCTUARY == nil)
-	check("only Salvation is party-only among the blessings", P.SALVATION.partyOnly == true and not P.KINGS.partyOnly and not P.MIGHT.partyOnly and not P.LIGHT.partyOnly)
+	check("no blessing is party-only", not P.KINGS.partyOnly and not P.MIGHT.partyOnly and not P.WISDOM.partyOnly)
 
 	local function member(key, class, tier) return { unit = key, key = key, name = key, tier = tier or 1, class = class, order = 1 } end
 	local function pick(c) return ns.Select.Pick({ c }, { now = 100, settings = WM.db, caster = WM.caster, probe = ns.Probe }) end
@@ -1198,33 +1203,25 @@ do
 	check("...but someone with only Might (Kings assigned) is offered Kings", pick(member("party1", "WARRIOR")) and pick(member("party1", "WARRIOR")).buff.key == "KINGS")
 	W.units.party1.auras = {}
 
-	-- Salvation only works on party members
-	WM.db.party.assign.WARRIOR = "SALVATION"; WM.db.others.assign.WARRIOR = "SALVATION"
-	W.known[1038] = true
-	check("Salvation on a group member is offered", pick(member("party1", "WARRIOR", 1)) and pick(member("party1", "WARRIOR", 1)).buff.key == "SALVATION")
-	local bS, skS = pick(member("nameplate1", "WARRIOR", 2))
-	check("Salvation on a stranger is refused, with the reason", bS == nil and skS[1].reason:find("only works on party and raid members", 1, true) ~= nil)
-	WM.db.party.assign.WARRIOR = nil; WM.db.others.assign.WARRIOR = nil
-
-	-- settings: Salvation is offered for Party / Raid and Self but not for Others
+	-- settings: every section offers the same three blessings
 	local function items(dd)
 		local list = {}
 		dd.menuGen(dd, { CreateRadio = function(_, label, _, _, data) list[#list + 1] = data; return { SetTooltip = function() end } end })
 		return list
 	end
-	check("Party / Raid dropdown offers all five blessings plus Skip",
-		table.concat(items(E.g.WellMetPartyClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
-	check("Others dropdown leaves Salvation and Light out (not for strangers)",
+	check("Party / Raid dropdown offers the three blessings plus Skip",
+		table.concat(items(E.g.WellMetPartyClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,NONE")
+	check("Others dropdown offers the same",
 		table.concat(items(E.g.WellMetOthersClassWARRIOR), ",") == "MIGHT,WISDOM,KINGS,NONE")
-	check("the Self 'Blessing' dropdown offers all five", table.concat(items(E.g.WellMetSelfOwn), ",") == "MIGHT,WISDOM,KINGS,SALVATION,LIGHT,NONE")
+	check("the Self 'Blessing' dropdown offers the same", table.concat(items(E.g.WellMetSelfOwn), ",") == "MIGHT,WISDOM,KINGS,NONE")
 
 	-- the "nobody needs ..." line names only the blessings that are assigned somewhere
 	W.plates = {}; W.groupSize = 0; W.units.party1 = nil          -- nobody else around
-	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true, ["Blessing of Kings"] = true, ["Blessing of Light"] = true, ["Blessing of Salvation"] = true }
+	W.units.player.auras = { ["Devotion Aura"] = true, ["Blessing of Wisdom"] = true, ["Blessing of Kings"] = true }
 	W.spells["Devotion Aura"] = 465; W.known[465] = true
 	W.prints = {}
 	press(E)
-	check("by default the message names the blessings of the default lists (neither Light nor Salvation is one)",
+	check("by default the message names the blessings of the default lists (all three)",
 		printed(W, "Nobody nearby needs Blessing of Might / Blessing of Wisdom / Blessing of Kings."))
 	local function setLists(section, key)
 		for _, class in ipairs(ns.TargetClasses) do
@@ -1314,19 +1311,6 @@ do
 	check("on yourself too: Kings from another Paladin means your 2nd choice", bs and bs.buff.key == "WISDOM")
 	local bl = run({ KINGS = "other", MIGHT = "other", WISDOM = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" }, assign3 = { WARRIOR = "WISDOM" } })
 	check("a 3rd choice is used when the first two are on them from others", bl and bl.buff.key == "WISDOM")
-	local bn, skn = run({ KINGS = "other", LIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "LIGHT" } })
-	check("Light is never cast on a stranger", bn == nil and skn[1].reason:find("already has Blessing of Kings", 1, true) ~= nil)
-	-- never Salvation on a tank in your group
-	local tankM = { unit = "party1", key = "G-t", name = "Tank", tier = 1, class = "WARRIOR", order = 1, tank = true }
-	local sTank = mkSettings({}); sTank.party.assign = { WARRIOR = "SALVATION" }; sTank.party.assign2 = { WARRIOR = "KINGS" }
-	local bt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent", KINGS = "absent" }) })
-	check("a tank skips Salvation and gets the next blessing", bt and bt.buff.key == "KINGS")
-	tankM.tank = false
-	bt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent", KINGS = "absent" }) })
-	check("...anyone else gets Salvation first", bt and bt.buff.key == "SALVATION")
-	tankM.tank = true; sTank.party.assign2 = {}
-	local bt2, skt = ns.Select.Pick({ tankM }, { now = 100, settings = sTank, caster = WM.caster, probe = probeOf({ SALVATION = "absent" }) })
-	check("a tank whose only blessing is Salvation is skipped, with the reason", bt2 == nil and skt[1].reason:find("tank", 1, true) ~= nil)
 	local bu = run({ KINGS = "absent", MIGHT = "absent" }, { assign = { WARRIOR = "KINGS" }, assign2 = { WARRIOR = "MIGHT" } }, stranger("WARRIOR"))
 	check("(the first choice still wins when nothing is on them)", bu and bu.buff.key == "KINGS")
 
@@ -1335,11 +1319,6 @@ do
 	local b11, sk11 = run({ KINGS = "absent", MIGHT = "absent" })
 	check("the primary was just tried: skipped, not switched to the secondary", b11 == nil and reason(sk11):find("tried recently", 1, true) ~= nil)
 	ns.Select.Reset()
-
-	-- a party-only blessing as the secondary is refused for a stranger
-	local settings = mkSettings({ assign2 = { WARRIOR = "SALVATION" } }); settings.others.assign = { WARRIOR = "KINGS" }
-	local b12, sk12 = ns.Select.Pick({ stranger() }, { now = 100, settings = settings, caster = WM.caster, probe = probeOf({ KINGS = "other", SALVATION = "absent" }) })
-	check("Salvation in a stranger's list is left out (party only): Kings from someone else means nothing to cast", b12 == nil and reason(sk12):find("already has Blessing of Kings", 1, true) ~= nil)
 
 	-- AuraState: who cast what is on someone
 	addUnit(W, "nameplate1", { class = "WARRIOR", name = "Stranger", guid = "G-x", auras = {} })
@@ -1372,9 +1351,9 @@ do
 		btn.attrs.type == "macro" and btn.attrs.macrotext:find("/cast [@target,exists,help,nodead] Blessing of Might", 1, true) ~= nil)
 	check("...and the debug log says why", WM:BuildReport():find("on them from someone else, so Blessing of Might instead", 1, true) ~= nil)
 
-	-- settings: every section has one dropdown per slot (Others one fewer: no Salvation)
-	check("every class has a dropdown per slot: 5 on Party / Raid and Self, 3 on Others",
-		E.g.WellMetPartyClassWARRIORSlot5 ~= nil and E.g.WellMetPartyClassWARRIORSlot6 == nil and E.g.WellMetSelfOwn5 ~= nil
+	-- settings: every section has one dropdown per slot (one per blessing)
+	check("every class has a dropdown per slot: 3 on every section",
+		E.g.WellMetPartyClassWARRIORSlot3 ~= nil and E.g.WellMetPartyClassWARRIORSlot4 == nil and E.g.WellMetSelfOwn3 ~= nil
 		and E.g.WellMetOthersClassWARRIORSlot3 ~= nil and E.g.WellMetOthersClassWARRIORSlot4 == nil and E.g.WellMetOthersClassWARRIORSecond ~= nil)
 	local function items(dd)
 		local list = {}
@@ -1384,7 +1363,7 @@ do
 	local second = items(E.g.WellMetOthersClassWARRIORSecond)
 	local seq = {}
 	for _, it in ipairs(second) do seq[#seq + 1] = it.data end
-	check("a later slot lists the blessings you can give a stranger (no Salvation, no Light) and 'Nothing'",
+	check("a later slot lists the blessings you can give a stranger and 'Nothing'",
 		table.concat(seq, ",") == "MIGHT,WISDOM,KINGS,NONE" and second[4].label:find("Nothing", 1, true) ~= nil)
 	check("...and it shows the saved 2nd choice (Might) as selected", second[1].on and not second[4].on)
 	E.g.WellMetOthersClassWARRIORSecond.menuGen(E.g.WellMetOthersClassWARRIORSecond, { CreateRadio = function(_, _, _, set, data) if data == "WISDOM" then set() end; return { SetTooltip = function() end } end })
@@ -1761,13 +1740,12 @@ do
 	radius[2].pick()
 	check("picking 28 yards saves it for Party / Raid only", WM.db.party.radius == 28 and WM.db.others.radius == 0)
 	local warrior = menuOf(E.g.WellMetPartyClassWARRIOR)
-	check("a Party / Raid class dropdown lists Might / Wisdom / Kings / Salvation / Light / Skip, each with an icon in the open list",
-		#warrior == 6 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
+	check("a Party / Raid class dropdown lists Might / Wisdom / Kings / Skip, each with an icon in the open list",
+		#warrior == 4 and warrior[1].label:find("Blessing of Might", 1, true) and warrior[1].label:find("|T1019834:", 1, true)
 		and warrior[2].label:find("|T1019742:", 1, true) and warrior[3].label:find("Blessing of Kings", 1, true)
-		and warrior[4].label:find("Blessing of Salvation", 1, true) and warrior[5].label:find("Blessing of Light", 1, true)
-		and warrior[6].label:find("Skip this class", 1, true) and warrior[6].label:find("|T", 1, true))
+		and warrior[4].label:find("Skip this class", 1, true) and warrior[4].label:find("|T", 1, true))
 	check("menu items carry their value, and the closed dropdown shows only the icon",
-		warrior[1].data == "MIGHT" and warrior[3].data == "KINGS" and warrior[6].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
+		warrior[1].data == "MIGHT" and warrior[3].data == "KINGS" and warrior[4].data == "NONE" and E.g.WellMetPartyClassWARRIOR.selTranslator ~= nil
 		and E.g.WellMetPartyClassWARRIOR.selTranslator({ data = "WISDOM" }) == "|T1019742:20|t")
 	check("the class default is the selected item (Warrior -> Kings first)", warrior[3].selected and not warrior[2].selected)
 	check("every class starts with Kings, then its own: Hunter Wisdom then Might, Mage Wisdom", ns.AssignedKey(WM.db.party, "HUNTER") == "KINGS"
@@ -1776,7 +1754,7 @@ do
 	check("picking Wisdom for Warrior saves it in Party / Raid, and Others is untouched",
 		WM.db.party.assign.WARRIOR == "WISDOM" and WM.db.others.assign.WARRIOR == nil and menuOf(E.g.WellMetPartyClassWARRIOR)[2].selected
 		and menuOf(E.g.WellMetOthersClassWARRIOR)[3].selected)
-	menuOf(E.g.WellMetOthersClassWARRIOR)[4].pick()          -- the last item in Others is Skip (neither Salvation nor Light is offered there)
+	menuOf(E.g.WellMetOthersClassWARRIOR)[4].pick()          -- the last item in Others is Skip 
 	check("...each section keeps its own table (Others: Skip, Party / Raid: Wisdom)", WM.db.others.assign.WARRIOR == "NONE" and WM.db.party.assign.WARRIOR == "WISDOM")
 	WM.db.party.radius = 0
 	for _, f in ipairs(ns.PRIO_FIELDS) do WM.db.party[f].WARRIOR = nil; WM.db.others[f].WARRIOR = nil end     -- leave the settings as found
@@ -1961,8 +1939,8 @@ do
 		and ns.PrioList(others, "WARRIOR")[2] == "WISDOM")
 	ns.SetAllAssign(others, "assign2", "WISDOM")
 	check("2nd slot: clicking it again empties the slot for all", ns.AssignCount(others, "assign2", "NONE") == N)
-	ns.SetAllAssign(others, "assign3", "LIGHT")
-	check("3rd slot works the same way", ns.AssignCount(others, "assign3", "LIGHT") == N)
+	ns.SetAllAssign(others, "assign3", "MIGHT")
+	check("3rd slot works the same way", ns.AssignCount(others, "assign3", "MIGHT") == N)
 
 	-- stack mode
 	local WM2, ns2 = load({ class = "MAGE" })
@@ -2255,7 +2233,7 @@ do
 	check("!none and !default", parse("!none") == "none" and parse("!default") == "clear" and parse("!clear") == "clear")
 	check("ordinary talk is not a request", parse("bom pls") == nil and parse("hello !bom") == nil and parse("!") == nil and parse("!zzz") == nil)
 	check("a secret / non-string text is not a request", R.Parse(caster, SECRET) == nil and R.Parse(caster, nil) == nil)
-	check("the announce lists every blessing's first word", R.AnnounceText(caster):find("!bom !bow !bok !bos !bol", 1, true) ~= nil and #R.AnnounceText(caster) < 255)
+	check("the announce lists every blessing's first word", R.AnnounceText(caster):find("!bom !bow !bok", 1, true) ~= nil and #R.AnnounceText(caster) < 255)
 	local mageWM = load({ class = "MAGE" })
 	check("Mage: !ai asks for Arcane Intellect, !amp for Amplify", select(2, R.Parse(mageWM.caster, "!ai")) == "INTELLECT" and select(2, R.Parse(mageWM.caster, "!amp")) == "AMPLIFY")
 

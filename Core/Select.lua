@@ -83,7 +83,7 @@ function Select.BuffsFor(caster, class, cfg, tier)
 	for _, key in ipairs(ns.PrioList(cfg, class)) do
 		local buff = caster.buffs[key]
 		if buff and not buff.selfOnly then
-			if buff.partyOnly and tier == 2 then partyOnly = partyOnly or buff elseif buff.noStrangers and tier == 2 then -- left out
+			if buff.partyOnly and tier == 2 then partyOnly = partyOnly or buff
 			else list[#list + 1] = buff end
 		end
 	end
@@ -160,7 +160,6 @@ function Select.Pick(cands, ctx)
 	-- when it is a refresh of a buff that is running out).
 	local function whyNot(cand, buff, cfg, skipAura)
 		if buff.partyOnly and cand.tier == 2 then return buff.name .. " only works on party and raid members" end
-		if buff.noStrangers and cand.tier == 2 then return buff.name .. " is not cast on strangers" end
 		if not known(buff) then return buff.name .. " is not learned" end
 		if probe.tooLow and probe.tooLow(buff, cand.unit) then return "target is too low level for " .. buff.name end
 		local blocked, left = Select.IsBlocked(cand.key, buff.name, now)
@@ -221,10 +220,7 @@ function Select.Pick(cands, ctx)
 		local function skip(buff, reason) skipped[#skipped + 1] = { cand = cand, reason = reason, buff = buff } end
 		local learned = {}
 		for _, buff in ipairs(list) do
-			if known(buff) and not (probe.tooLow and probe.tooLow(buff, cand.unit)) and not (cand.tank and buff.key == "SALVATION") then learned[#learned + 1] = buff end     -- never Salvation on a tank
-		end
-		if #learned == 0 and cand.tank and #list == 1 and list[1].key == "SALVATION" then
-			return skip(list[1], "a tank: Salvation is never cast on one")
+			if known(buff) and not (probe.tooLow and probe.tooLow(buff, cand.unit)) then learned[#learned + 1] = buff end
 		end
 		-- your hand-picked target gets the first blessing you know, whatever is on them
 		if isForced(cand) then return add(cand, learned[1] or list[1], cfg) end

@@ -1,9 +1,9 @@
-# WellMet — in-game test plan (WoW Forever, build 1.60.1.70205)
+# WellMet — in-game test plan (WoW Forever, build 1.60.1.70938)
 
-Run `luajit tests/run.lua` first (expect `93 passed, 0 failed`). The headless tests prove the logic against
+Run `lua tests/run.lua` first (expect `499 passed, 0 failed`). The headless tests prove the logic against
 the *documented* API; this plan settles what only the real client can answer.
 
-Setup: addon is symlinked into `_classic_beta_/Interface/AddOns/WellMet`. Use a **Paladin**.
+Setup: put the addon in the WoW Forever client's `Interface/AddOns/WellMet` (a symlink to this repo works; during the beta that was `_classic_beta_`). Use a **Paladin**.
 `/console scriptErrors 1` so Lua errors show. After any code change: `/reload`.
 Everywhere below, **"paste the log"** = `/wellmet log` → click in the text → Ctrl+A, Ctrl+C → paste to me.
 
@@ -21,7 +21,7 @@ Everywhere below, **"paste the log"** = `/wellmet log` → click in the text →
 | A8 | How often does a cast fail after the range check (line of sight)? | T6 |
 
 ## T1 — Loads
-1. Log in. Expect `WellMet: v0.1.0 loaded.` and **no Lua error**. AddOn list: WellMet not "Incompatible".
+1. Log in. Expect `WellMet: v1.8.0 loaded.` (or the current version) and **no Lua error**. AddOn list: WellMet not "Incompatible".
 2. `/wellmet` opens the settings panel (stock look). `Esc` → Options → Key Bindings → AddOns: a **WellMet**
    section with "Buff the next nearby player".
 3. `/wellmet log` → paste. (Check the `buff MIGHT/WISDOM` lines: ids resolved, `known=yes`.)
@@ -51,6 +51,7 @@ Everywhere below, **"paste the log"** = `/wellmet log` → click in the text →
 - **Assignments**: set Warrior → Wisdom / Skip; press near a warrior: matches. Set an unreadable-class default.
 - **Low-level target** (Mage, Arcane Intellect Rank 3): press on a level 10 player. Expect Rank 2 (or 1), log line "rank: target level 10 is too low ...". If the game refuses, the log says "a lower rank ... will be tried" and the next press steps down. Not yet tried in game.
 - **Rank test**: in a city, `/wellmet ranktest`, press the key repeatedly (a player level each time), then `/wellmet ranktest report` and paste it. The report says which ranks each target level refused / accepted and whether one gap rule fits. Not yet tried in game.
+- **Blessings** (Paladin): the dropdowns offer Might, Wisdom, Kings only (no Light, no Salvation: not in Forever; `/wellmet debug` lists neither). A character that saved either one earlier shows that slot empty. Press near a level 9 player with Kings first in their list: Kings is skipped and the next blessing is cast (needs the log line "target is too low level for Blessing of Kings"). Not yet tried in game.
 - **Group first** off, **Buff myself** off: behave as labelled.
 - **Don't buff PvP-flagged players, unless I'm flagged** (on): with yourself unflagged, a flagged player is skipped (`/wellmet log` says "PvP flagged (and you are not)"); flag yourself and the same player is buffed; untick the setting and flagged players are buffed again. Not yet tried in game.
 

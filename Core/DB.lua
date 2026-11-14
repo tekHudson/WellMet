@@ -66,10 +66,31 @@ local function migrate(p)
 	p.schema = 2
 end
 
+-- Blessing of Light and Blessing of Salvation are not in Forever: a slot that still holds one is emptied, and a chat request for it is forgotten.
+local REMOVED = { LIGHT = true, SALVATION = true }
+local function dropRemoved(p)
+	for _, sectionKey in ipairs({ "self", "party", "others" }) do
+		local section = p[sectionKey]
+		if type(section) == "table" then
+			for _, field in ipairs({ "assign", "assign2", "assign3", "assign4", "assign5" }) do
+				local slot = section[field]
+				if type(slot) == "table" then
+					for class, key in pairs(slot) do if REMOVED[key] then slot[class] = "NONE" end end
+				end
+			end
+		end
+	end
+	local list = type(p.requests) == "table" and p.requests.list
+	if type(list) == "table" then
+		for guid, req in pairs(list) do if type(req) == "table" and REMOVED[req.buff] then list[guid] = nil end end
+	end
+end
+
 function WM:InitDB()
 	WellMetDB = WellMetDB or {}
 	local profile = WellMetDB.profile or {}
 	migrate(profile)
+	dropRemoved(profile)
 	WellMetDB.profile = applyDefaults(profile, DEFAULTS)
 	WM.db = WellMetDB.profile
 end

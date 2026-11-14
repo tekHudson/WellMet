@@ -23,7 +23,6 @@ ns.TargetClasses = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN"
 --                "stack":  several buffs per target, each switched on/off per target class (Mage).
 --   tags      = the words a player can ask for it with in chat (!bom, !fort ...), first one is the one the announce shows (Core/Requests.lua)
 --   partyOnly = true: the spell works on "party member"s only, so strangers are never offered it.
---   noStrangers = true: not offered for strangers either (Blessing of Light: a healer's buff, not for a passer-by).
 --   stack buffs also carry: defaultClasses (target classes it is ON for by default) and exclusive (the buff it replaces, so only one of the two can be on for a class).
 --   selfCategories = the caster's OWN buffs, one choice per category (an aura, an armor), cast on yourself
 --   first. A category is { key, title, default = <buff key | "AUTO" | "NONE">, choices = { buff keys },
@@ -36,19 +35,15 @@ ns.CasterData = {
 	PALADIN = {
 		mode = "assign",
 		title = "Which blessings on which class, in order",
-		-- Every blessing you keep up for an hour on Forever (spellbook, checked 2026-10-06): Might (level 4), Wisdom (14),
-		-- Kings (20), Salvation (26), Light (40); the Greater versions count as "has it". A Paladin can only have ONE
+		-- Every blessing you keep up for an hour on Forever (spellbook, checked 2026-11-13, build 70938): Might (level 4),
+		-- Wisdom (14), Kings (20); the Greater versions count as "has it". Blessing of Light and Blessing of Salvation are not in Forever. A Paladin can only have ONE
 		-- blessing on a target at a time, so the per-class choice is one blessing (or none). Left out on purpose because
 		-- they last 10-30 seconds and are not buffs to keep up: Protection, Freedom, Sacrifice. Forever has no Sanctuary.
-		-- partyOnly: the spell says "party member", so it is never offered for strangers.
-		order = { "MIGHT", "WISDOM", "KINGS", "SALVATION", "LIGHT" },
+		order = { "MIGHT", "WISDOM", "KINGS" },
 		buffs = {
 			MIGHT  = { key = "MIGHT", tags = { "bom", "might" },  name = "Blessing of Might",  alt = { "Greater Blessing of Might" },  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice" },
 			WISDOM = { key = "WISDOM", tags = { "bow", "wisdom" }, name = "Blessing of Wisdom", alt = { "Greater Blessing of Wisdom" }, icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom" },
 			KINGS  = { key = "KINGS", tags = { "bok", "kings" },  name = "Blessing of Kings",  alt = { "Greater Blessing of Kings" },  icon = "Interface\\Icons\\Spell_Magic_MageArmor" },
-			SALVATION = { key = "SALVATION", tags = { "bos", "salvation", "salv" }, name = "Blessing of Salvation", alt = { "Greater Blessing of Salvation" }, partyOnly = true,
-			              icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation" },
-			LIGHT  = { key = "LIGHT", tags = { "bol", "light" },  name = "Blessing of Light",  alt = { "Greater Blessing of Light" }, noStrangers = true,  icon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02" },
 			DEVOTION      = { key = "DEVOTION",      selfOnly = true, name = "Devotion Aura",          icon = "Interface\\Icons\\Spell_Holy_DevotionAura" },
 			RETRIBUTION   = { key = "RETRIBUTION",   selfOnly = true, name = "Retribution Aura",       icon = "Interface\\Icons\\Spell_Holy_AuraOfLight" },
 			CONCENTRATION = { key = "CONCENTRATION", selfOnly = true, name = "Concentration Aura",     icon = "Interface\\Icons\\Spell_Holy_MindSooth" },
@@ -138,7 +133,6 @@ end
 
 -- Default blessings per target class, in order (all editable in settings). The key casts the first one that is learned
 -- and not already on them, so Kings is listed first for everyone and the next one takes over until it is learned.
--- Light (healer-only) and Salvation (cuts threat, group only) are options, not defaults.
 ns.DefaultPrio = {
 	WARRIOR = { "KINGS", "MIGHT" },
 	ROGUE   = { "KINGS", "MIGHT" },
