@@ -1,6 +1,6 @@
 --[[ WellMet — minimap button (native, no libraries).
 
-Left-click opens the settings, right-click shows / hides the reminder icons, Ctrl-click announces how to
+Left-click opens the settings, right-click opens the quick menu (own buffs, reminder icons), Ctrl-click announces how to
 request a buff, Shift-click opens the copyable log, drag moves it around the minimap. The icon is Icons/Icon.tga: "WM" in IM Fell English SC (SIL OFL), antiqued gold on dark
 grey, 128x128.
 ]]
@@ -11,6 +11,40 @@ local WM = ns.WM
 
 local ICON = "Interface\\AddOns\\WellMet\\Icons\\Icon"
 local RIM = 5        -- how far past the minimap's edge the button's centre sits (on the border art)
+
+-- Quick menu (right-click): one radio group per own-buff category (aura, armor ...) that saves at once, plus the
+-- reminder strip toggle. Offers "best learned" (when the category has one), the learned choices, and None.
+local function iconTag(buff)
+	local tex = ns.SpellIcon(buff)
+	return tex and ("|T" .. tex .. ":14|t ") or ""
+end
+
+function WM:OpenQuickMenu(owner)
+	if not (_G.MenuUtil and MenuUtil.CreateContextMenu) then WM:OpenOptions(); return end
+	local caster = WM.caster
+	MenuUtil.CreateContextMenu(owner, function(_, root)
+		root:CreateTitle("WellMet: yourself")
+		for _, cat in ipairs(caster.selfCategories) do
+			local function radio(label, value)
+				root:CreateRadio(label,
+					function() return (WM.db.self.choice[cat.key] or cat.default) == value end,
+					function() WM.db.self.choice[cat.key] = value; WM:Log("quick menu: " .. cat.key .. " = " .. value) end)
+			end
+			root:CreateTitle(cat.title)
+			if cat.auto then radio(cat.autoLabel, "AUTO") end
+			for _, key in ipairs(cat.choices) do
+				local buff = caster.buffs[key]
+				if ns.IsKnown(buff) then radio(iconTag(buff) .. buff.name, key) end
+			end
+			radio("None", "NONE")
+		end
+		root:CreateDivider()
+		root:CreateCheckbox("Reminder icons",
+			function() return WM.db.strip.enabled end,
+			function() WM:ToggleStrip() end)
+		root:CreateButton("Settings", function() WM:OpenOptions() end)
+	end)
+end
 
 function WM:CreateMinimap()
 	local b = CreateFrame("Button", "WellMetMinimap", Minimap)
@@ -41,8 +75,7 @@ function WM:CreateMinimap()
 		WM:Log("minimap click: " .. ns.SafeStr(button) .. " shift=" .. ns.SafeStr(IsShiftKeyDown()) .. " ctrl=" .. ns.SafeStr(IsControlKeyDown()))
 		if IsShiftKeyDown() then WM:ShowLog()
 		elseif IsControlKeyDown() then WM:Announce()
-		elseif button == "RightButton" then
-			WM:Print("reminder strip: " .. (WM:ToggleStrip() and "ON" or "OFF"))
+		elseif button == "RightButton" then WM:OpenQuickMenu(b)
 		else WM:OpenOptions() end
 	end)
 	b:RegisterForDrag("LeftButton")
@@ -63,7 +96,7 @@ function WM:CreateMinimap()
 		local key = GetBindingKey(ns.CLICK_ACTION)
 		GameTooltip:AddLine(key and ("Key: " .. key) or "No key bound (Key Bindings > WellMet)", 1, 1, 1)
 		GameTooltip:AddLine("Left-click: settings", 1, 1, 1)
-		GameTooltip:AddLine("Right-click: show / hide the reminder icons", 1, 1, 1)
+		GameTooltip:AddLine("Right-click: quick menu (aura, armor ...)", 1, 1, 1)
 		GameTooltip:AddLine("Ctrl-click: announce how to request a buff", 1, 1, 1)
 		GameTooltip:AddLine("Shift-click: log", 1, 1, 1)
 		GameTooltip:Show()

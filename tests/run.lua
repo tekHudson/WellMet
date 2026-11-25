@@ -2353,10 +2353,30 @@ do
 	WM.OpenOptions = function() optionsOpened = true end
 	WM.db.strip.enabled = false
 	W.sentChat = nil
+	-- right-click builds the quick menu: radios per own-buff category that save at once, then the strip toggle
+	local items = {}
+	local root = {}
+	function root:CreateTitle(t) items[#items + 1] = { kind = "title", text = t } end
+	function root:CreateDivider() end
+	function root:CreateRadio(t, isSel, set) items[#items + 1] = { kind = "radio", text = t, isSel = isSel, set = set } end
+	function root:CreateCheckbox(t, isSel, set) items[#items + 1] = { kind = "check", text = t, isSel = isSel, set = set } end
+	function root:CreateButton(t, cb) items[#items + 1] = { kind = "button", text = t, cb = cb } end
+	E.g.MenuUtil = { CreateContextMenu = function(_, gen) gen(nil, root) end }
 	mm.scripts.OnClick(mm, "RightButton")
-	check("minimap right-click shows the reminder icons", WM.db.strip.enabled == true)
-	mm.scripts.OnClick(mm, "RightButton")
-	check("...and hides them again", WM.db.strip.enabled == false)
+	local radios, check1 = {}, nil
+	for _, it in ipairs(items) do
+		if it.kind == "radio" then radios[#radios + 1] = it elseif it.kind == "check" then check1 = it end
+	end
+	check("minimap right-click opens a quick menu with radios for the own buffs", #radios > 0)
+	local pick
+	for _, r in ipairs(radios) do if r.text == "None" then pick = r break end end
+	pick.set()
+	check("picking a quick-menu entry saves the choice at once", pick.isSel() == true)
+	check("quick menu offers the reminder icons toggle", check1 ~= nil and check1.isSel() == false)
+	check1.set()
+	check("...and the toggle works", WM.db.strip.enabled == true)
+	WM.db.strip.enabled = false
+	E.g.MenuUtil = nil
 	mm.scripts.OnClick(mm, "LeftButton")
 	check("minimap left-click opens the settings", optionsOpened == true)
 	E.g.IsShiftKeyDown = function() return true end
