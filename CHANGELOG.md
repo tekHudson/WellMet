@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- When someone whispers a buff request (`!bok`, `!fort`, `!none`, `!default` ...), WellMet whispers back to confirm it. On by default; Group tools > "Whisper back to confirm a whispered request" turns it off. Party and raid chat requests get no reply, and nothing is sent during a chat lockdown.
 - Right-clicking the minimap button opens a quick menu: change your own aura, armor, Righteous Fury or Inner Fire on the spot (saved at once), and toggle the reminder icons (the old right-click action).
 
 ## [1.8.0] - 2026-11-13

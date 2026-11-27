@@ -85,7 +85,7 @@ local function newEnv(W)
 	g.LE_PARTY_CATEGORY_INSTANCE = 2
 	g.IsInGroup = function(cat) if cat then return W.instanceGroup or false end return W.groupSize > 0 end
 	g.GetPlayerInfoByGUID = function(guid) return nil, (W.guidClass or {})[guid] end
-	g.SendChatMessage = function(msg, channel) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel } end
+	g.SendChatMessage = function(msg, channel, _, target) W.sentChat = W.sentChat or {}; W.sentChat[#W.sentChat + 1] = { msg = msg, channel = channel, target = target } end
 	g.ChatFrameUtil = { OpenChat = function(text) W.chatBox = text end }
 	g.ActionButtonSpellAlertManager = { ShowAlert = function(_, f) W.alerts = W.alerts or {}; W.alerts[f] = true end, HideAlert = function(_, f) if W.alerts then W.alerts[f] = nil end end }
 	g.GetRaidRosterInfo = function(i) return "raid" .. i, 0, (W.subgroups or {})[i] or 1 end
@@ -2255,6 +2255,22 @@ do
 	check("...and it is announced to you", printed(W, "Brakka asked for: Blessing of Kings"))
 	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bom", "Brakka", "", "", "", "", 0, 0, "", 0, 2, "Player-brakka")
 	check("a whisper changes it", R.List()["Player-brakka"].buff == "MIGHT")
+	check("...and the whisperer gets a confirming whisper", W.sentChat and #W.sentChat == 1 and W.sentChat[1].channel == "WHISPER"
+		and W.sentChat[1].msg:find("Blessing of Might", 1, true) ~= nil and W.sentChat[1].target == "Brakka", W.sentChat and W.sentChat[1] and W.sentChat[1].msg)
+	check("...a party request gets no reply", (function() W.sentChat = nil
+		f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!bow", "Brakka", "", "", "", "", 0, 0, "", 0, 9, "Player-brakka"); return W.sentChat == nil end)())
+	W.chatLockdown = true; W.sentChat = nil
+	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bom", "Brakka", "", "", "", "", 0, 0, "", 0, 10, "Player-brakka")
+	check("...no reply during a chat lockdown", W.sentChat == nil)
+	W.chatLockdown = false
+	WM.db.requests.reply = false
+	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bok", "Brakka", "", "", "", "", 0, 0, "", 0, 11, "Player-brakka")
+	check("...no reply with the setting off", W.sentChat == nil)
+	WM.db.requests.reply = true
+	check("reply texts for none and default", R.ReplyText(caster, "none"):find("no buff", 1, true) and R.ReplyText(caster, "clear"):find("default", 1, true))
+	W.sentChat = nil
+	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bom", "Brakka", "", "", "", "", 0, 0, "", 0, 12, "Player-brakka")
+	W.sentChat = nil
 	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!none", "Brakka", "", "", "", "", 0, 0, "", 0, 3, "Player-brakka")
 	check("!none stores 'no buff'", R.List()["Player-brakka"].buff == "NONE")
 	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!default", "Brakka", "", "", "", "", 0, 0, "", 0, 4, "Player-brakka")

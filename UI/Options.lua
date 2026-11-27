@@ -675,6 +675,9 @@ local function buildGroupToolsPanel()
 	row = checkRows(panel, y)
 	y = row("Listen for buff requests", function() return WM.db.requests.enabled end,
 		function(v) WM.db.requests.enabled = v and true or false; WM:ApplyRequests() end)
+	row = checkRows(panel, y)
+	y = row("Whisper back to confirm a whispered request", function() return WM.db.requests.reply end,
+		function(v) WM.db.requests.reply = v and true or false end)
 	makeText(panel, "Players say !" .. WM.caster.buffs[WM.caster.order[1]].tags[1] .. ", !none or !default in party / raid chat or whisper you, and the key buffs them with that "
 		.. "instead of their class default. Remembered until they change it or you clear it. Chat is hidden during encounters, Mythic+ and PvP, so "
 		.. "new requests only arrive outside them.", 24, y)
@@ -685,6 +688,7 @@ local function buildGroupToolsPanel()
 	panel.refreshers[#panel.refreshers + 1] = function()
 		countText:SetText(ns.Requests.Count(ns.Requests.List()) .. " saved")
 	end
+
 	return fitPanel(panel, y)
 end
 

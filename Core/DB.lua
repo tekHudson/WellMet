@@ -25,7 +25,7 @@ local DEFAULTS = {
 	refresh      = { enabled = true, percent = 20 },   -- buff people whose buff is running out: when this share of its time is left
 	castOnTarget = { enabled = true },    -- a player you target by hand is buffed even if their buff has plenty of time left
 	buffBack     = { enabled = true },    -- whoever just buffed you (last 10 s) is buffed first, if they need it
-	requests     = { enabled = true, list = {} },    -- what players asked for in chat: list[casterClass][guid] = { buff, name, class, at }
+	requests     = { enabled = true, reply = true, list = {} },    -- what players asked for in chat: list[casterClass][guid] = { buff, name, class, at }
 	rankTest     = {},         -- /wellmet ranktest results: class -> target level -> which ranks were refused / accepted
 	debug        = false,      -- record the /wellmet log and show press-time chat messages
 	self   = { enabled = true,  choice = {}, assign = {}, assign2 = {}, assign3 = {}, assign4 = {}, assign5 = {}, stack = {} },

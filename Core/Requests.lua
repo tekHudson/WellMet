@@ -64,6 +64,13 @@ function Requests.Describe(caster, req)
 	return buff and buff.name or ("unknown buff " .. ns.SafeStr(req.buff))
 end
 
+-- The whisper that confirms a request. kind: "set" / "none" / "clear".
+function Requests.ReplyText(caster, kind, req)
+	if kind == "clear" then return "WellMet: OK, you're back to my default buff." end
+	if kind == "none" then return "WellMet: OK, no buff from me." end
+	return "WellMet: OK, I'll buff you with " .. Requests.Describe(caster, req) .. " when I get to you."
+end
+
 -- The line the announce sends: the first tag of each buff a player can ask for.
 function Requests.AnnounceText(caster)
 	local tags = {}
@@ -88,6 +95,19 @@ function Requests.Active()
 end
 
 local function readable(v) return v ~= nil and not issecretvalue(v) end
+
+-- Whisper `text` back to `sender`. Only ever in answer to their own whisper. Skipped (and logged) while the game
+-- blocks addon chat; a refused send is logged, never thrown.
+function Requests.Reply(sender, text)
+	if C_ChatInfo.InChatMessagingLockdown() then
+		WM:Log("reply skipped: chat messaging lockdown")
+		return false
+	end
+	local send = C_ChatInfo.SendChatMessage or SendChatMessage
+	local ok, err = pcall(send, text, "WHISPER", nil, sender)
+	WM:Log(ok and "reply whispered" or ("reply failed: " .. ns.SafeStr(err)))
+	return ok
+end
 
 -- A chat line arrived. `...` is what follows text and sender in a CHAT_MSG_* event (the guid is the tenth).
 function Requests.OnChat(event, text, sender, ...)
@@ -114,6 +134,9 @@ function Requests.OnChat(event, text, sender, ...)
 		WM:Log("request: " .. name .. " -> " .. buffKey .. " via " .. event)
 	end
 	if WM.refreshOptions then WM.refreshOptions() end
+	if event == "CHAT_MSG_WHISPER" and WM.db.requests.reply then
+		Requests.Reply(sender, Requests.ReplyText(WM.caster, kind, list[guid]))
+	end
 end
 
 local frame = CreateFrame("Frame")
