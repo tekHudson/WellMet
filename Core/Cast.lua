@@ -165,7 +165,9 @@ function WM:OnPress(b, fromMacro)
 	end
 	-- the macro above puts this stranger in your target slot; that is not "a target you picked", so remember it
 	ns.addonTarget = cand.fullName and { guid = cand.guid, at = now } or ns.addonTarget
-	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now, rankLevel = rankLevel, test = test and true or nil, testLevel = test and test.level or nil }
+	WM.pending = { key = cand.key, spell = buff.name, unit = cand.unit, name = cand.name, at = now,
+		guid = cand.guid, fullName = cand.fullName, class = cand.class, level = level,
+		stranger = cand.tier == 2 and not (UnitInParty(cand.unit) or UnitInRaid(cand.unit)) or false, rankLevel = rankLevel, test = test and true or nil, testLevel = test and test.level or nil }
 	WM:Log("press: armed", buff.name, "on", cand.name, "(" .. cand.unit .. ",", "tier " .. cand.tier .. ",",
 		"dist " .. ns.SafeStr(best.dist ~= math.huge and best.dist or "?") .. ")" .. (best.note and (" - " .. best.note) or ""))
 end
@@ -252,6 +254,7 @@ local function onSucceeded(_, castGUID)
 	WM:Log("cast ok:", p.spell, "->", p.name)
 	ns.Select.Succeeded(p.key, p.spell)
 	WM.pending = nil
+	if not p.test then ns.BuffAsk.Maybe(p) end
 end
 
 local function onError(_, message)

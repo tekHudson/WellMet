@@ -6,6 +6,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com) and
 
 ## [Unreleased]
 ### Added
+- Ask for a buff back (Group tools, off by default): after you buff a stranger (not in your group) whose level is within 5-20 levels of yours (default 10) and whose class buffs others, WellMet whispers them asking for the buff you lack from their class (Arcane Intellect from a Mage, Mark of the Wild from a Druid ...). Each person is asked once per session, never in combat or a chat lockdown. The message is yours to edit, with {name}, {spell} and {mybuff}.
 - When someone whispers a buff request (`!bok`, `!fort`, `!none`, `!default` ...), WellMet whispers back to confirm it. On by default; Group tools > "Whisper back to confirm a whispered request" turns it off. Party and raid chat requests get no reply, and nothing is sent during a chat lockdown.
 - Right-clicking the minimap button opens a quick menu: change your own aura, armor, Righteous Fury or Inner Fire on the spot (saved at once), and toggle the reminder icons (the old right-click action).
 

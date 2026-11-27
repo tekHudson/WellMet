@@ -689,6 +689,43 @@ local function buildGroupToolsPanel()
 		countText:SetText(ns.Requests.Count(ns.Requests.List()) .. " saved")
 	end
 
+	-- ask a stranger you just buffed to buff you back (Core/BuffAsk.lua)
+	y = y - 44
+	makeHeader(panel, "Ask for a buff back", 16, y); y = y - 28
+	row = checkRows(panel, y)
+	y = row("Whisper strangers I buff and ask for a buff back", function() return WM.db.askBack.enabled end,
+		function(v) WM.db.askBack.enabled = v and true or false end)
+	makeText(panel, "Only strangers (not in your group), only when their class buffs others and you lack that buff, only once per person "
+		.. "per session, and never in combat.", 24, y)
+	y = y - 36
+	makeText(panel, "Only within", 24, y - 5)
+	local dd = makeDropdown(panel, "WellMetAskLevels", 130, 100, y + 2,
+		{ { value = 5, label = "5 levels of mine" }, { value = 10, label = "10 levels of mine" },
+		  { value = 15, label = "15 levels of mine" }, { value = 20, label = "20 levels of mine" }, { value = 99, label = "any level" } },
+		function() return WM.db.askBack.levels end,
+		function(v) WM.db.askBack.levels = v end)
+	panel.refreshers[#panel.refreshers + 1] = dd.refresh
+	y = y - 36
+	makeText(panel, "Message ({name} = them, {spell} = the buff you ask for, {mybuff} = the buff you gave them):", 24, y)
+	y = y - 22
+	local box = CreateFrame("EditBox", "WellMetAskMessage", panel, "InputBoxTemplate")
+	box:SetSize(500, 24)
+	box:SetPoint("TOPLEFT", 30, y)
+	box:SetAutoFocus(false)
+	box:SetMaxLetters(ns.BuffAsk.MAX)
+	local function save() WM.db.askBack.message = box:GetText() or "" end
+	box:SetScript("OnEnterPressed", function(self) save(); self:ClearFocus() end)
+	box:SetScript("OnEscapePressed", function(self) self:SetText(WM.db.askBack.message ~= "" and WM.db.askBack.message or ns.BuffAsk.DEFAULT_MESSAGE); self:ClearFocus() end)
+	box:SetScript("OnEditFocusLost", save)
+	panel.refreshers[#panel.refreshers + 1] = function()
+		box:SetText(WM.db.askBack.message ~= "" and WM.db.askBack.message or ns.BuffAsk.DEFAULT_MESSAGE)
+		box:SetCursorPosition(0)
+	end
+	y = y - 32
+	makeButton(panel, "Reset message", 130, 24, y, function()
+		WM.db.askBack.message = ""
+		box:SetText(ns.BuffAsk.DEFAULT_MESSAGE); box:SetCursorPosition(0)
+	end, "WellMetAskResetButton")
 	return fitPanel(panel, y)
 end
 

@@ -165,6 +165,8 @@ local function newEnv(W)
 	}
 	g.SpellIsTargeting = function() return false end
 	g.UnitCastingInfo = function() return nil end
+	g.UnitInParty = function(u) return (u == "player" or tostring(u):match("^party%d") or (U(u) and U(u).inParty)) and true or false end
+	g.UnitInRaid = function(u) return (tostring(u):match("^raid%d") or (U(u) and U(u).inRaid)) and true or false end
 	g.UnitLevel = function(u) local x = U(u); return x and (x.level or 60) or nil end
 	g.Enum = g.Enum or {}
 	g.Enum.SpellBookSpellBank = { Player = 0 }
@@ -2271,6 +2273,48 @@ do
 	W.sentChat = nil
 	f.scripts.OnEvent(f, "CHAT_MSG_WHISPER", "!bom", "Brakka", "", "", "", "", 0, 0, "", 0, 12, "Player-brakka")
 	W.sentChat = nil
+
+	-- ask a stranger for a buff back (Core/BuffAsk.lua)
+	do
+		local BA = ns.BuffAsk
+		local mage = ns.CasterData.MAGE
+		check("Render fills {name} {spell} {mybuff} and keeps unknown words", BA.Render("{name}: {spell} / {mybuff} / {x}", { name = "Ann", spell = "S", mybuff = "M" }) == "Ann: S / M / {x}")
+		check("Render caps one chat line", #BA.Render(string.rep("a", 400), {}) == 255)
+		check("Choose: a class with no buffs for others gives nothing", BA.Choose("WARRIOR", "PALADIN", function() return true end) == nil)
+		check("Choose: a Mage is asked for Arcane Intellect when you lack it", BA.Choose("MAGE", "PALADIN", function() return true end) == mage.buffs.INTELLECT)
+		check("Choose: nothing when you already have it", BA.Choose("MAGE", "PALADIN", function() return false end) == nil)
+		check("Choose: never a party-only buff (Dampen)", (function() local seen
+			BA.Choose("MAGE", "PALADIN", function(b) seen = seen or {}; seen[b.key] = true; return false end); return seen and not seen.DAMPEN end)())
+		check("Choose: a Paladin is asked for the first blessing suited to your class that you lack", BA.Choose("PALADIN", "WARRIOR", function(b) return b.key ~= "KINGS" end).key == "MIGHT")
+		local mine = E.g.UnitLevel("player")
+		local function p(over) local t = { name = "Ann", fullName = "Ann Lee", guid = "Player-ann", class = "MAGE", level = mine + 3, stranger = true, spell = "Blessing of Kings" }
+			for k, v in pairs(over or {}) do t[k] = v end; return t end
+		W.sentChat = nil; BA.Forget()
+		WM.db.askBack.enabled = false
+		BA.Maybe(p())
+		check("ask back: off by default / switched off sends nothing", W.sentChat == nil)
+		WM.db.askBack.enabled = true; WM.db.askBack.message = ""
+		BA.Maybe(p())
+		check("ask back: whispers a stranger of a buffing class within the level window", W.sentChat and #W.sentChat == 1 and W.sentChat[1].channel == "WHISPER"
+			and W.sentChat[1].target == "Ann Lee" and W.sentChat[1].msg:find("Arcane Intellect", 1, true) ~= nil and W.sentChat[1].msg:find("Ann", 1, true) ~= nil, W.sentChat and W.sentChat[1] and W.sentChat[1].msg)
+		W.sentChat = nil; BA.Maybe(p())
+		check("ask back: only once per person", W.sentChat == nil)
+		BA.Forget()
+		BA.Maybe(p({ stranger = false })); check("ask back: never a group member", W.sentChat == nil)
+		BA.Maybe(p({ level = mine + 11 })); check("ask back: not outside the level window", W.sentChat == nil)
+		BA.Maybe(p({ class = "WARRIOR" })); check("ask back: not a class that buffs nobody", W.sentChat == nil)
+		W.chatLockdown = true; BA.Maybe(p()); W.chatLockdown = false
+		check("ask back: nothing during a chat lockdown", W.sentChat == nil)
+		E.g.UnitNameFromGUID = function() return "Ann", "Otherrealm" end
+		W.sentChat = nil; BA.Forget(); BA.Maybe(p())
+		check("ask back: a player from another realm is whispered Name-Realm", W.sentChat and W.sentChat[1].target == "Ann-Otherrealm", W.sentChat and W.sentChat[1] and W.sentChat[1].target)
+		E.g.UnitNameFromGUID = nil
+		WM.db.askBack.message = "Hey {name}, {spell} please"
+		W.sentChat = nil; BA.Forget()
+		BA.Maybe(p())
+		check("ask back: uses your own message text", W.sentChat and W.sentChat[1].msg == "Hey Ann, Arcane Intellect please", W.sentChat and W.sentChat[1] and W.sentChat[1].msg)
+		WM.db.askBack.enabled = false; WM.db.askBack.message = ""; BA.Forget(); W.sentChat = nil
+	end
 	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!none", "Brakka", "", "", "", "", 0, 0, "", 0, 3, "Player-brakka")
 	check("!none stores 'no buff'", R.List()["Player-brakka"].buff == "NONE")
 	f.scripts.OnEvent(f, "CHAT_MSG_PARTY", "!default", "Brakka", "", "", "", "", 0, 0, "", 0, 4, "Player-brakka")
